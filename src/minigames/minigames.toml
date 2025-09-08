@@ -110,3 +110,6 @@ type = [ "kotlin",]
 id = "minefield"
 type = [ "kotlin",]
 
+[[minigames]]
+id = "killeporter"
+type = [ "kotlin",]
