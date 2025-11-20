@@ -100,7 +100,7 @@ public class AimMasterInstance extends FFAGameInstance implements MapBootstrap {
     }
 
     @Override
-    protected void ready() {
+    protected void go() {
 
         var sequenceItems = sequence.getItems();
 
@@ -134,7 +134,7 @@ public class AimMasterInstance extends FFAGameInstance implements MapBootstrap {
             bossBar.getBossBar(serverPlayer).setPercent((float) newScore / scoreGoal);
 
             BlockPos target = domain.getCurrentTarget();
-            ServerWorld serverWorld = serverPlayer.getWorld();
+            ServerWorld serverWorld = serverPlayer.getEntityWorld();
 
             if (target!=null) serverWorld.spawnParticles(ParticleTypes.ELECTRIC_SPARK, target.getX(), target.getY(), target.getZ(), 12, 0.4, 0.4, 0.4, 0.01);
             player.playSoundToPlayer(SoundEvents.ENTITY_ARROW_HIT_PLAYER, SoundCategory.PLAYERS, 0.5f, 0.8f);
@@ -157,7 +157,7 @@ public class AimMasterInstance extends FFAGameInstance implements MapBootstrap {
 
         //play victory animation
         Task task = new Task(winner, domain, sequence);
-        TaskHandle taskHandle = gameHandle.getScheduler().interval(task, 5);
+        TaskHandle taskHandle = gameHandle.getRootScheduler().interval(task, 5);
 
         winManager.complete().then(taskHandle::cancel);
     }

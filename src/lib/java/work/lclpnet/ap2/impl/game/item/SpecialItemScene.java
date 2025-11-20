@@ -11,15 +11,11 @@ import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 import org.joml.Vector3d;
-import work.lclpnet.ap2.impl.scene.MixedMountContext;
-import work.lclpnet.ap2.impl.scene.Scene;
-import work.lclpnet.ap2.impl.scene.animation.AnimationContext;
-import work.lclpnet.ap2.impl.scene.simulation.Gradient;
-import work.lclpnet.ap2.impl.scene.simulation.SimpleGravityGradient;
-import work.lclpnet.ap2.impl.scene.simulation.StateVector;
-import work.lclpnet.ap2.impl.scene.simulation.solver.EulerSolver;
-import work.lclpnet.ap2.impl.scene.simulation.solver.NumericalSolver;
-import work.lclpnet.ap2.impl.util.world.entity.DynamicEntityManager;
+import work.lclpnet.gaco.dynamic_entities.DynamicEntityManager;
+import work.lclpnet.gaco.math.solver.*;
+import work.lclpnet.gaco.scene.MixedMountContext;
+import work.lclpnet.gaco.scene.Scene;
+import work.lclpnet.gaco.scene.animation.AnimationContext;
 import work.lclpnet.kibu.hook.Hook;
 import work.lclpnet.kibu.hook.HookFactory;
 import work.lclpnet.kibu.hook.HookRegistrar;
@@ -179,7 +175,7 @@ public class SpecialItemScene {
             object.startPickup(player, () -> remove(object));
 
             float pitch = (random.nextFloat() - random.nextFloat()) * 1.4F + 2.0F;
-            player.getWorld().playSound(null, object.position.x, object.position.y, object.position.z, SoundEvents.ENTITY_ITEM_PICKUP, SoundCategory.PLAYERS, 0.2F, pitch);
+            player.getEntityWorld().playSound(null, object.position.x, object.position.y, object.position.z, SoundEvents.ENTITY_ITEM_PICKUP, SoundCategory.PLAYERS, 0.2F, pitch);
         }
     }
 

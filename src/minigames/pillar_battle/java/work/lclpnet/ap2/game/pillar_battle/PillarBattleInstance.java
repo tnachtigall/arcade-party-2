@@ -46,7 +46,7 @@ public class PillarBattleInstance extends EliminationGameInstance implements Map
     public PillarBattleInstance(MiniGameHandle gameHandle) {
         super(gameHandle);
 
-        movementBlocker = new SimpleMovementBlocker(gameHandle.getGameScheduler());
+        movementBlocker = new SimpleMovementBlocker(gameHandle.getScheduler());
         movementBlocker.setModifySpeedAttribute(false);
 
         useSurvivalMode();
@@ -110,7 +110,7 @@ public class PillarBattleInstance extends EliminationGameInstance implements Map
     }
 
     @Override
-    protected void ready() {
+    protected void go() {
         Translations translations = gameHandle.getTranslations();
 
         gameHandle.protect(config -> {
@@ -132,11 +132,11 @@ public class PillarBattleInstance extends EliminationGameInstance implements Map
             movementBlocker.enableMovement(player);
         }
 
-        commons().whenBelowCriticalHeight().then(player -> player.damage(player.getWorld(), player.getDamageSources().outOfWorld(), player.getHealth()));
+        commons().whenBelowCriticalHeight().then(player -> player.damage(player.getEntityWorld(), player.getDamageSources().outOfWorld(), player.getHealth()));
 
         var randomizer = new PbRandomizer(random, gameHandle.getParticipants(), getWorld().getRegistryManager());
 
-        var scheduler = gameHandle.getGameScheduler();
+        var scheduler = gameHandle.getScheduler();
         scheduler.interval(randomizer::giveRandomItems, RANDOM_ITEM_DELAY_TICKS);
 
         var hooks = gameHandle.getHooks();

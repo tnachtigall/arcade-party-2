@@ -1,17 +1,14 @@
 package work.lclpnet.ap2.impl.game.item;
 
-import com.mojang.serialization.DataResult;
 import com.mojang.serialization.MapCodec;
 import lombok.Getter;
 import lombok.Setter;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.DamageResistantComponent;
 import net.minecraft.component.type.LoreComponent;
-import net.minecraft.component.type.NbtComponent;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
-import net.minecraft.nbt.NbtOps;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.registry.tag.DamageTypeTags;
 import net.minecraft.screen.slot.Slot;
@@ -28,12 +25,13 @@ import org.jetbrains.annotations.Nullable;
 import org.json.JSONObject;
 import work.lclpnet.ap2.api.game.MiniGameHandle;
 import work.lclpnet.ap2.api.util.world.BlockPredicate;
-import work.lclpnet.ap2.impl.ds.WeightedList;
 import work.lclpnet.ap2.impl.map.MapUtil;
+import work.lclpnet.ap2.impl.util.CustomNbt;
 import work.lclpnet.ap2.impl.util.IconMaker;
 import work.lclpnet.ap2.impl.util.debug.DebugController;
 import work.lclpnet.ap2.impl.util.world.WalkableBlockPredicate;
 import work.lclpnet.ap2.impl.util.world.block_shape.BlockShape;
+import work.lclpnet.gaco.ds.WeightedList;
 import work.lclpnet.kibu.hook.HookRegistrar;
 import work.lclpnet.kibu.hook.entity.PlayerInteractionHooks;
 import work.lclpnet.kibu.hook.player.PlayerInventoryHooks;
@@ -106,7 +104,7 @@ public class SpecialItems implements SpecialItemContext {
 
         positions.setShape(shape);
 
-        scene.init(gameHandle.getScheduler(), gameHandle.getHooks());
+        scene.init(gameHandle.getRootScheduler(), gameHandle.getHooks());
     }
 
     public static @NotNull BlockShape getSpawnArea(GameMap map) {
@@ -124,7 +122,7 @@ public class SpecialItems implements SpecialItemContext {
         scene.onPickup().register(this::pickup);
 
         HookRegistrar hooks = gameHandle.getHooks();
-        TaskScheduler scheduler = gameHandle.getGameScheduler();
+        TaskScheduler scheduler = gameHandle.getScheduler();
 
         hooks.registerHook(PlayerInventoryHooks.DROP_ITEM, this::onDropItem);
         hooks.registerHook(PlayerInteractionHooks.USE_ITEM, this::interact);
@@ -306,7 +304,7 @@ public class SpecialItems implements SpecialItemContext {
 
     @Override
     public TaskScheduler scheduler() {
-        return gameHandle.getGameScheduler();
+        return gameHandle.getScheduler();
     }
 
     @Override
@@ -315,9 +313,7 @@ public class SpecialItems implements SpecialItemContext {
     }
 
     public Optional<SpecialItem> get(ItemStack stack) {
-        NbtComponent component = stack.getOrDefault(DataComponentTypes.CUSTOM_DATA, NbtComponent.DEFAULT);
-        DataResult<NbtCompound> res = component.get(NBT_CODEC);
-        NbtCompound nbt = res.resultOrPartial().orElse(null);
+        NbtCompound nbt = CustomNbt.get(stack, NBT_CODEC).orElse(null);
 
         if (nbt == null) {
             return Optional.empty();
@@ -333,9 +329,7 @@ public class SpecialItems implements SpecialItemContext {
         var nbt = new NbtCompound();
         nbt.putString(ID_KEY, item.id());
 
-        stack.set(DataComponentTypes.CUSTOM_DATA, stack.getOrDefault(DataComponentTypes.CUSTOM_DATA, NbtComponent.DEFAULT)
-                .with(NbtOps.INSTANCE, NBT_CODEC, nbt)
-                .getOrThrow());
+        CustomNbt.set(stack, NBT_CODEC, nbt);
 
         stack.set(DataComponentTypes.DAMAGE_RESISTANT, new DamageResistantComponent(DamageTypeTags.IS_FIRE));
         stack.set(DataComponentTypes.RARITY, Rarity.UNCOMMON);
@@ -381,7 +375,7 @@ public class SpecialItems implements SpecialItemContext {
     private void scheduleDespawn(SpecialItemObject obj) {
         if (despawnTicks <= 0) return;
 
-        gameHandle.getGameScheduler().interval(new SchedulerAction() {
+        gameHandle.getScheduler().interval(new SchedulerAction() {
             int timer = 0;
             int particle = 0;
 
@@ -408,7 +402,7 @@ public class SpecialItems implements SpecialItemContext {
     }
 
     public void spawnPeriodically() {
-        gameHandle.getGameScheduler().interval(new Runnable() {
+        gameHandle.getScheduler().interval(new Runnable() {
             int timer = 0;
             int next = randomInterval();
 
@@ -432,7 +426,7 @@ public class SpecialItems implements SpecialItemContext {
     public void syncWithWorldBorder() {
         WorldBorder border = world.getWorldBorder();
 
-        gameHandle.getGameScheduler().interval(new Runnable() {
+        gameHandle.getScheduler().interval(new Runnable() {
             double prevSize = Double.NaN, prevCenterX = Double.NaN, prevCenterZ = Double.NaN;
 
             @Override

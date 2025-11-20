@@ -21,6 +21,7 @@ import net.minecraft.util.Formatting;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.GameRules;
+import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import work.lclpnet.ap2.api.base.Participants;
 import work.lclpnet.ap2.api.game.MiniGameHandle;
@@ -51,9 +52,10 @@ public class SpeedBuildersInstance extends EliminationGameInstance implements Ma
 
     private static final int
             LOOK_DURATION_SECONDS = 8,
-            JUDGE_DURATION_TICKS = Ticks.seconds(6),
+            JUDGE_DURATION_TICKS = Ticks.seconds(5),
             JUDGE_ANNOUNCEMENT_TICKS = Ticks.seconds(3),
             DESTROY_DELAY_TICKS = Ticks.seconds(4);
+
     private final Random random;
     private final SbSetup setup;
     private final SbItems items;
@@ -77,7 +79,7 @@ public class SpeedBuildersInstance extends EliminationGameInstance implements Ma
     }
 
     @Override
-    public CompletableFuture<Void> createWorldBootstrap(ServerWorld world, GameMap map) {
+    public @NotNull CompletableFuture<Void> createWorldBootstrap(@NotNull ServerWorld world, @NotNull GameMap map) {
         return setup.setup(map, world).thenRun(() -> {
             Participants participants = gameHandle.getParticipants();
 
@@ -115,16 +117,16 @@ public class SpeedBuildersInstance extends EliminationGameInstance implements Ma
             scoreboardManager.joinTeam(player, team);
         }
 
-        gameHandle.getScheduler().interval(manager::tick, 1);
+        gameHandle.getRootScheduler().interval(manager::tick, 1);
     }
 
     @Override
-    protected void ready() {
+    protected void go() {
         SbConfiguration config = new SbConfiguration(gameHandle, manager, items);
         config.configureProtection();
         config.registerHooks();
 
-        gameHandle.getHookRegistrar().registerHook(ProjectileHooks.HIT_BLOCK, this::onHitBlock);
+        gameHandle.getHooks().registerHook(ProjectileHooks.HIT_BLOCK, this::onHitBlock);
 
         nextRound();
     }
@@ -175,8 +177,11 @@ public class SpeedBuildersInstance extends EliminationGameInstance implements Ma
     private void startBuilding() {
         commons().announcer().announceSubtitle("game.ap2.speed_builders.copy");
 
+        var entities = manager.getPreviewEntities();
+
+        manager.clearIslands();
         manager.setBuildingPhase(true);
-        items.giveBuildingMaterials(gameHandle.getParticipants(), manager.getPreviewEntities());
+        items.giveBuildingMaterials(gameHandle.getParticipants(), entities);
 
         Translations translations = gameHandle.getTranslations();
 
@@ -207,7 +212,7 @@ public class SpeedBuildersInstance extends EliminationGameInstance implements Ma
         announcer.withTimes(5, 50, 0)
                 .announce("game.ap2.speed_builders.time_up", null);
 
-        TaskScheduler scheduler = gameHandle.getGameScheduler();
+        TaskScheduler scheduler = gameHandle.getScheduler();
 
         scheduler.timeout(() -> announcer.silent()
                 .withTimes(0, 35, 5)
@@ -227,7 +232,7 @@ public class SpeedBuildersInstance extends EliminationGameInstance implements Ma
     private void announceJudgementDone() {
         commons().announcer().announceSubtitle("game.ap2.speed_builders.judgement");
 
-        gameHandle.getGameScheduler().timeout(this::announceJudgement, JUDGE_ANNOUNCEMENT_TICKS);
+        gameHandle.getScheduler().timeout(this::announceJudgement, JUDGE_ANNOUNCEMENT_TICKS);
     }
 
     private void announceJudgement() {
@@ -251,7 +256,7 @@ public class SpeedBuildersInstance extends EliminationGameInstance implements Ma
 
         manager.getIsland(worst).ifPresent(destruction::setAelosLookingTowards);
 
-        gameHandle.getGameScheduler().timeout(() -> fireChargeTowardsPlayerIsland(worst.getUuid()), DESTROY_DELAY_TICKS);
+        gameHandle.getScheduler().timeout(() -> fireChargeTowardsPlayerIsland(worst.getUuid()), DESTROY_DELAY_TICKS);
     }
 
     private void fireChargeTowardsPlayerIsland(UUID worstUuid) {
@@ -279,7 +284,7 @@ public class SpeedBuildersInstance extends EliminationGameInstance implements Ma
 
         ServerWorld world = getWorld();
 
-        gameHandle.getGameScheduler().interval(task -> {
+        gameHandle.getScheduler().interval(task -> {
             if (!charge.isAlive()) {
                 task.cancel();
                 return;
@@ -289,7 +294,7 @@ public class SpeedBuildersInstance extends EliminationGameInstance implements Ma
         }, 1);
 
         // make sure the island is destroyed, if the projectile somehow misses ¯\_(ツ)_/¯
-        gameHandle.getGameScheduler().timeout(() -> {
+        gameHandle.getScheduler().timeout(() -> {
             if (charge.isAlive()) {
                 charge.discard();
             }
@@ -318,7 +323,7 @@ public class SpeedBuildersInstance extends EliminationGameInstance implements Ma
         Vec3d velocity;
 
         if (projectile != null) {
-            impactPos = projectile.getPos();
+            impactPos = projectile.getEntityPos();
             velocity = projectile.getVelocity().normalize();
         } else {
             impactPos = islandToDestroy.getCenter();
@@ -349,7 +354,7 @@ public class SpeedBuildersInstance extends EliminationGameInstance implements Ma
 
         VelocityModifier.setVelocity(player, velocity.add(0, 1.5, 0).normalize().multiply(3));
 
-        gameHandle.getGameScheduler().timeout(() -> {
+        gameHandle.getScheduler().timeout(() -> {
             ServerPlayerEntity futurePlayer = playerManager.getPlayer(playerToEliminate);
 
             if (futurePlayer != null) {
@@ -401,6 +406,6 @@ public class SpeedBuildersInstance extends EliminationGameInstance implements Ma
                 .withSound(SoundEvents.ENTITY_BREEZE_IDLE_AIR, SoundCategory.HOSTILE, 1f, 1.2f)
                 .announceSubtitle("game.ap2.speed_builders.impressed");
 
-        gameHandle.getGameScheduler().timeout(this::nextRoundOrGameOver, Ticks.seconds(3));
+        gameHandle.getScheduler().timeout(this::nextRoundOrGameOver, Ticks.seconds(3));
     }
 }

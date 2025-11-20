@@ -86,6 +86,11 @@ sourceSets {
         compileClasspath += lib.output
         runtimeClasspath += lib.output
     }
+
+    genResources {
+        compileClasspath += main.compileClasspath
+        runtimeClasspath += main.runtimeClasspath
+    }
 }
 
 static <C> C loadToml(File file, C config) {
@@ -160,6 +165,7 @@ minigamesConfig.minigames.each { minigame ->
         runtimeClasspath += sourceSets.lib.output
 
         sourceSets.main.runtimeClasspath += set.output
+        sourceSets.genResources.runtimeClasspath += set.output
         sourceSets.test.compileClasspath += set.output
         sourceSets.test.runtimeClasspath += set.output
     }
@@ -192,8 +198,6 @@ dependencies {
     compileOnly("org.jetbrains:annotations:26.0.2")
     include(implementation("work.lclpnet:json-config4j:1.0.0"))
     include(implementation("org.apache.commons:commons-compress:1.26.2"))
-    include(implementation("org.ejml:ejml-core:0.44.0"))
-    include(implementation("org.ejml:ejml-simple:0.44.0"))
 
     modImplementation("net.fabricmc.fabric-api:fabric-api:${project.fabric_version}")
     modImplementation("work.lclpnet.mods.kibu:kibu:${project.kibu_version}")
@@ -204,19 +208,20 @@ dependencies {
     modImplementation("work.lclpnet.mods:notica:${project.notica_version}")
     modImplementation("work.lclpnet.mods:mg-lobby:${project.lobby_version}")
     modImplementation("net.fabricmc:fabric-language-kotlin:${project.kotlin_version}")
+    modImplementation("work.lclpnet.mods:pal:${project.pal_version}")
+    modImplementation("work.lclpnet.mods.gaco:gaco:${project.gaco_version}")
+    modImplementation("work.lclpnet.mods.gaco:game-map-api:${project.game_map_api_version}")
 
     // runtime dependencies
-    modRuntimeOnly("maven.modrinth:sqlite-jdbc:3.41.2.1+20230506")
+    modRuntimeOnly("maven.modrinth:minecraft-sqlite-jdbc:3.49.1.0+2025-07-12")
 
     // optional runtime dependencies (not explicitly required for compilation, but needed to play the game)
-    modLocalRuntime("work.lclpnet.mods:pal:${project.pal_version}")
     modLocalRuntime("work.lclpnet.mods:ruler:${project.ruler_version}")
     modLocalRuntime("work.lclpnet.mcserver-api:mcserver-api-fabric:${project.mcserver_api_version}")
     implementation("work.lclpnet:translations4j:${project.translations4j_version}")
     implementation("work.lclpnet:translations4j:${project.translations4j_version}:network")
 
     // optional runtime dependencies (not required to play)
-    modLocalRuntime("work.lclpnet.mods:mc-debug-sender-impl:${project.mc_debug_sender_impl_version}")
     modLocalRuntime("maven.modrinth:anti-xray:${project.anti_xray_version}")
     localRuntime("com.moandjiezana.toml:toml4j:${project.toml_version}")
 
@@ -240,6 +245,12 @@ loom {
 
         server {
             vmArgs "-Dfabric-tag-conventions-v2.missingTagTranslationWarning=SILENCED"
+        }
+
+        genResources {
+            server()
+            configName = "Generate Resources"
+            source = sourceSets.genResources
         }
     }
 

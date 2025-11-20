@@ -5,7 +5,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.world.border.WorldBorder;
-import net.minecraft.world.border.WorldBorderListener;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import work.lclpnet.activity.manager.ActivityManager;
@@ -20,14 +20,18 @@ import work.lclpnet.ap2.api.game.MiniGameHandle;
 import work.lclpnet.ap2.api.game.MiniGameResults;
 import work.lclpnet.ap2.api.game.team.TeamConfig;
 import work.lclpnet.ap2.api.map.MapFacade;
+import work.lclpnet.ap2.api.music.SongCache;
 import work.lclpnet.ap2.api.music.SongManager;
+import work.lclpnet.ap2.api.stats.StatsResult;
 import work.lclpnet.ap2.core.type.ApServerPlayerEntity;
 import work.lclpnet.ap2.impl.game.PlayerUtil;
 import work.lclpnet.ap2.impl.util.DeathMessages;
 import work.lclpnet.ap2.impl.util.scoreboard.CustomScoreboardManager;
+import work.lclpnet.ap2.impl.util.world.SubWorldManager;
 import work.lclpnet.ap2.mode_default.ApMiniGameArgs;
 import work.lclpnet.ap2.mode_default.activity.MiniGameActivity;
 import work.lclpnet.ap2.mode_default.activity.PreparationActivity;
+import work.lclpnet.gaco.asset.AssetRepository;
 import work.lclpnet.kibu.cmd.type.CommandRegistrar;
 import work.lclpnet.kibu.hook.HookStack;
 import work.lclpnet.kibu.scheduler.api.TaskScheduler;
@@ -35,6 +39,7 @@ import work.lclpnet.kibu.scheduler.util.SchedulerStack;
 import work.lclpnet.kibu.translate.Translations;
 import work.lclpnet.kibu.translate.bossbar.BossBarProvider;
 import work.lclpnet.lobby.game.api.WorldFacade;
+import work.lclpnet.lobby.game.impl.WorldContainer;
 import work.lclpnet.lobby.game.impl.prot.BasicProtector;
 import work.lclpnet.lobby.game.impl.prot.MutableProtectionConfig;
 import work.lclpnet.lobby.game.util.ProtectorUtils;
@@ -42,6 +47,7 @@ import work.lclpnet.notica.Notica;
 import work.lclpnet.notica.api.SongHandle;
 
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 
@@ -56,11 +62,14 @@ public class DefaultMiniGameHandle implements MiniGameHandle, WorldBorderManager
     private final AtomicBoolean remake;
     private MutableProtectionConfig protectionConfig;
     private volatile BasicProtector protector = null;
-    private WorldBorderListener worldBorderListener = null;
     private volatile List<Runnable> whenDone = null;
-    private TaskScheduler scheduler = null;
+    private TaskScheduler rootScheduler = null;
     private boolean ended = false;
     private volatile DeathMessages deathMessages = null;
+    private volatile @Nullable CompletableFuture<UUID> statsId = null;
+    private volatile @Nullable SubWorldManager subWorldManager = null;
+    private volatile @Nullable WorldContainer worldContainer = null;
+    private @Nullable ServerWorld world = null;
 
     public DefaultMiniGameHandle(MiniGame game, ApBaseArgs args, BossBarProvider bossBarProvider,
                                  BossBarHandler bossBarHandler, CustomScoreboardManager scoreboardManager,
@@ -81,7 +90,7 @@ public class DefaultMiniGameHandle implements MiniGameHandle, WorldBorderManager
         container.commandStack().push();
         container.schedulerStack().push();
 
-        scheduler = container.schedulerStack().current();
+        rootScheduler = container.schedulerStack().current();
 
         container.schedulerStack().push();
     }
@@ -122,12 +131,12 @@ public class DefaultMiniGameHandle implements MiniGameHandle, WorldBorderManager
     }
 
     @Override
-    public TaskScheduler getScheduler() {
-        return scheduler;
+    public TaskScheduler getRootScheduler() {
+        return rootScheduler;
     }
 
     @Override
-    public SchedulerStack getGameScheduler() {
+    public SchedulerStack getScheduler() {
         return args.miniGameArgs().schedulerStack();
     }
 
@@ -177,6 +186,11 @@ public class DefaultMiniGameHandle implements MiniGameHandle, WorldBorderManager
     }
 
     @Override
+    public SongCache getSharedSongCache() {
+        return args.sharedSongCache();
+    }
+
+    @Override
     public DeathMessages getDeathMessages() {
         if (deathMessages != null) {
             return deathMessages;
@@ -197,8 +211,35 @@ public class DefaultMiniGameHandle implements MiniGameHandle, WorldBorderManager
     }
 
     @Override
+    public SubWorldManager getSubWorldManager() {
+        if (subWorldManager != null) {
+            return subWorldManager;
+        }
+
+        WorldContainer container;
+        SubWorldManager manager;
+
+        synchronized (this) {
+            if (subWorldManager != null) {
+                return subWorldManager;
+            }
+
+            AssetRepository repo = getMapFacade().getAssetRepository();
+            MinecraftServer server = getServer();
+
+            worldContainer = container = new WorldContainer(server);
+            subWorldManager = manager = new SubWorldManager(repo, server, container, logger);
+        }
+
+        container.init();
+        manager.init(getHooks());
+
+        return subWorldManager;
+    }
+
+    @Override
     public void resetGameScheduler() {
-        SchedulerStack stack = getGameScheduler();
+        SchedulerStack stack = getScheduler();
 
         stack.pop();
         stack.push();
@@ -317,44 +358,49 @@ public class DefaultMiniGameHandle implements MiniGameHandle, WorldBorderManager
         }
 
         getPlayerUtil().updatePlayerListNames();
+
+        var worldContainer = this.worldContainer;
+
+        if (worldContainer != null) worldContainer.unload();
     }
 
     @Override
     public WorldBorder getWorldBorder() {
-        return getServer().getOverworld().getWorldBorder();
+        return Objects.requireNonNull(world, "World is not set yet").getWorldBorder();
     }
 
     @Override
-    public void setupWorldBorder(ServerWorld world) {
-        WorldBorder mainBorder = getServer().getOverworld().getWorldBorder();
-        WorldBorder worldBorder = world.getWorldBorder();
-
-        if (worldBorderListener != null) {
-            mainBorder.removeListener(worldBorderListener);
-        }
-
-        worldBorderListener = new WorldBorderListener.WorldBorderSyncer(worldBorder);
-        mainBorder.addListener(worldBorderListener);
-    }
-
-    @Override
-    public void resetWorldBorder() {
-        WorldBorder worldBorder = getServer().getOverworld().getWorldBorder();
-
-        worldBorder.setCenter(0.5, 0.5);
-        worldBorder.setSize(worldBorder.getMaxRadius());
-        worldBorder.setSafeZone(5);
-        worldBorder.setDamagePerBlock(0.2);
-        worldBorder.setWarningTime(15);
-        worldBorder.setWarningBlocks(5);
-
-        if (worldBorderListener != null) {
-            worldBorder.removeListener(worldBorderListener);
-        }
+    public void setWorld(@Nullable ServerWorld world) {
+        this.world = world;
     }
 
     @Override
     public boolean isFinale() {
         return args.playerManager().isFinale();
+    }
+
+    @Override
+    public CompletableFuture<UUID> submitStats(StatsResult stats) {
+        if (statsId != null) {
+            return statsId;
+        }
+
+        synchronized (this) {
+            if (statsId != null) {
+                return statsId;
+            }
+
+            // in the future, the stats id should be allocated by the stats backend
+            // for now, just generate an id ourselves
+
+            return statsId = CompletableFuture.completedFuture(UUID.randomUUID()).whenComplete((id, err) -> {
+                if (err != null) {
+                    args.miniGameArgs().logger().error("Failed to submit stats", err);
+                    return;
+                }
+
+                args.stats().record(id, stats);
+            });
+        }
     }
 }

@@ -33,9 +33,9 @@ import work.lclpnet.ap2.game.musical_minecart.cmd.SkipSongCommand;
 import work.lclpnet.ap2.impl.game.EliminationGameInstance;
 import work.lclpnet.ap2.impl.map.MapUtil;
 import work.lclpnet.ap2.impl.music.SongHandler;
-import work.lclpnet.ap2.impl.util.BlockBox;
 import work.lclpnet.ap2.impl.util.Hints;
 import work.lclpnet.ap2.impl.util.SoundHelper;
+import work.lclpnet.gaco.ds.BlockBox;
 import work.lclpnet.kibu.cmd.type.CommandRegistrar;
 import work.lclpnet.kibu.hook.HookRegistrar;
 import work.lclpnet.kibu.hook.entity.EntityDismountCallback;
@@ -132,10 +132,10 @@ public class MusicalMinecartInstance extends EliminationGameInstance implements 
     }
 
     @Override
-    protected void ready() {
+    protected void go() {
         nextSong();
 
-        gameHandle.getGameScheduler().interval(this::tickParticle, 7);
+        gameHandle.getScheduler().interval(this::tickParticle, 7);
 
         ready.set(true);
 
@@ -221,7 +221,7 @@ public class MusicalMinecartInstance extends EliminationGameInstance implements 
             timer = commons().createTimerTicks("Queue %s / %s".formatted(done, total), delay);
         }
 
-        taskHandles = List.of(gameHandle.getGameScheduler().timeout(this::stopMusic, delay));
+        taskHandles = List.of(gameHandle.getScheduler().timeout(this::stopMusic, delay));
 
         TranslatedText nowPlaying = songs.nowPlayingText(config);
 
@@ -261,7 +261,7 @@ public class MusicalMinecartInstance extends EliminationGameInstance implements 
             player.sendMessage(msg, true);
         }
 
-        TaskScheduler scheduler = gameHandle.getGameScheduler();
+        TaskScheduler scheduler = gameHandle.getScheduler();
 
         taskHandles = List.of(
                 scheduler.timeout(this::markFreeMinecarts, eliminationDelayTicks / 2),
@@ -305,7 +305,7 @@ public class MusicalMinecartInstance extends EliminationGameInstance implements 
     @SuppressWarnings("unchecked")
     private void createDecoyEntity(ServerWorld world, MinecartEntity minecart) {
         var frog = new FrogEntity(EntityType.FROG, world);
-        frog.setPosition(minecart.getPos());
+        frog.setPosition(minecart.getEntityPos());
 
         var frogTypes = world.getRegistryManager().getOrThrow(RegistryKeys.FROG_VARIANT).getIndexedEntries();
 
@@ -368,7 +368,7 @@ public class MusicalMinecartInstance extends EliminationGameInstance implements 
 
         int passDelay = max(0, NEXT_SONG_DELAY_TICKS - Ticks.seconds(1));
 
-        TaskScheduler scheduler = gameHandle.getGameScheduler();
+        TaskScheduler scheduler = gameHandle.getScheduler();
 
         scheduler.timeout(() -> {
             for (ServerPlayerEntity player : participants) {

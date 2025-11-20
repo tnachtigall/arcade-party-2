@@ -66,10 +66,10 @@ public class SnowballFightInstance extends EliminationGameInstance {
     }
 
     @Override
-    protected void ready() {
+    protected void go() {
         Participants participants = gameHandle.getParticipants();
         HookRegistrar hooks = gameHandle.getHooks();
-        TaskScheduler scheduler = gameHandle.getGameScheduler();
+        TaskScheduler scheduler = gameHandle.getScheduler();
 
         gameHandle.protect(config -> {
             config.allow(ProtectionTypes.BREAK_BLOCKS, (entity, pos) -> {
@@ -89,7 +89,7 @@ public class SnowballFightInstance extends EliminationGameInstance {
         });
 
         hooks.registerHook(ServerLivingEntityHooks.ALLOW_DAMAGE, (entity, source, amount) -> {
-            if (source.getSource() instanceof SnowballEntity && Math.abs(amount) < 1e-4f && entity.getWorld() instanceof ServerWorld world) {
+            if (source.getSource() instanceof SnowballEntity && Math.abs(amount) < 1e-4f && entity.getEntityWorld() instanceof ServerWorld world) {
                 entity.damage(world, source, SNOWBALL_DAMAGE);
                 return false;
             }
@@ -187,7 +187,7 @@ public class SnowballFightInstance extends EliminationGameInstance {
     }
 
     private void onBreakBlock(ServerPlayerEntity player, BlockPos pos) {
-        BlockState state = player.getWorld().getBlockState(pos);
+        BlockState state = player.getEntityWorld().getBlockState(pos);
 
         if (state.isOf(Blocks.SNOW) || state.isOf(Blocks.SNOW_BLOCK) || state.isOf(Blocks.POWDER_SNOW)) {
             addSnowball(player);

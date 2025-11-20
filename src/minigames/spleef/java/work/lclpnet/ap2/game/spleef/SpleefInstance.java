@@ -18,8 +18,8 @@ import org.json.JSONArray;
 import work.lclpnet.ap2.api.game.MiniGameHandle;
 import work.lclpnet.ap2.impl.game.EliminationGameInstance;
 import work.lclpnet.ap2.impl.map.MapUtil;
-import work.lclpnet.ap2.impl.util.BlockBox;
 import work.lclpnet.ap2.impl.util.SoundHelper;
+import work.lclpnet.gaco.ds.BlockBox;
 import work.lclpnet.kibu.access.entity.PlayerInventoryAccess;
 import work.lclpnet.kibu.scheduler.Ticks;
 import work.lclpnet.kibu.translate.Translations;
@@ -48,10 +48,10 @@ public class SpleefInstance extends EliminationGameInstance {
     }
 
     @Override
-    protected void ready() {
+    protected void go() {
         gameHandle.protect(config -> {
             config.allow(ProtectionTypes.BREAK_BLOCKS, (entity, pos) -> {
-                World world = entity.getWorld();
+                World world = entity.getEntityWorld();
                 BlockState state = world.getBlockState(pos);
 
                 return state.isOf(Blocks.SNOW_BLOCK);

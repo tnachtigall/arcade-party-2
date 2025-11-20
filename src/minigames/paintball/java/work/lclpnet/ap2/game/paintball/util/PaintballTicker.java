@@ -29,10 +29,10 @@ import org.jetbrains.annotations.Nullable;
 import work.lclpnet.ap2.api.base.Participants;
 import work.lclpnet.ap2.api.game.team.DyeTeamKey;
 import work.lclpnet.ap2.impl.game.PlayerUtil;
-import work.lclpnet.ap2.impl.util.BlockBox;
 import work.lclpnet.ap2.impl.util.RayCastUtil;
 import work.lclpnet.ap2.impl.util.VanishManager;
 import work.lclpnet.ap2.impl.util.debug.DebugController;
+import work.lclpnet.gaco.ds.BlockBox;
 import work.lclpnet.kibu.hook.HookRegistrar;
 import work.lclpnet.kibu.hook.entity.ServerLivingEntityHooks;
 import work.lclpnet.kibu.scheduler.Ticks;
@@ -185,13 +185,13 @@ public class PaintballTicker {
         if (DEBUG_WALL_CLIMBING) {
             debugController.exclusive("input_" + player.getNameForScoreboard(), controller
                     -> controller.renderer().ifPresent(renderer
-                    -> renderer.arrow(player.getPos(), input, 0.5f, Blocks.REDSTONE_BLOCK.getDefaultState())));
+                    -> renderer.arrow(player.getEntityPos(), input, 0.5f, Blocks.REDSTONE_BLOCK.getDefaultState())));
         }
 
         EntityDimensions dimensions = player.getDimensions(player.getPose());
         float width = dimensions.width();
 
-        BlockHitResult hit = RayCastUtil.raycastBlocks(world, player.getPos(), input, width, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, ShapeContext.of(player));
+        BlockHitResult hit = RayCastUtil.raycastBlocks(world, player.getEntityPos(), input, width, RaycastContext.ShapeType.COLLIDER, RaycastContext.FluidHandling.NONE, ShapeContext.of(player));
 
         if (hit.getType() != HitResult.Type.BLOCK) return null;
 
@@ -240,7 +240,7 @@ public class PaintballTicker {
         double width = player.getDimensions(player.getPose()).width();
         BlockState ownInkContactState = null;
 
-        for (BlockPos pos : BlockBox.of(Box.of(player.getPos(), width, 0.1, width))) {
+        for (BlockPos pos : BlockBox.of(Box.of(player.getEntityPos(), width, 0.1, width))) {
             BlockState state = world.getBlockState(pos);
             DyeTeamKey paintTeam = paintManager.getTeam(state.getBlock());
 

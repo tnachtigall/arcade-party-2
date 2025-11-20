@@ -111,7 +111,7 @@ public class ManiacDiggerInstance extends FFAGameInstance implements MapBootstra
     }
 
     @Override
-    protected void ready() {
+    protected void go() {
         gameHandle.protect(config -> config.allow(ProtectionTypes.BREAK_BLOCKS, ProtectionTypes.MODIFY_INVENTORY));
 
         HookRegistrar hooks = gameHandle.getHooks();
@@ -127,7 +127,7 @@ public class ManiacDiggerInstance extends FFAGameInstance implements MapBootstra
             return ActionResult.PASS;
         });
 
-        gameHandle.getGameScheduler().interval(this::checkGoal, 1);
+        gameHandle.getScheduler().interval(this::checkGoal, 1);
     }
 
     private boolean canBreak(ServerPlayerEntity player, BlockPos pos) {
@@ -141,7 +141,7 @@ public class ManiacDiggerInstance extends FFAGameInstance implements MapBootstra
             return false;
         }
 
-        BlockState state = player.getWorld().getBlockState(pos);
+        BlockState state = player.getEntityWorld().getBlockState(pos);
 
         return !(state.getBlock() instanceof StainedGlassBlock) && !state.isOf(Blocks.GLASS);
     }
@@ -172,7 +172,7 @@ public class ManiacDiggerInstance extends FFAGameInstance implements MapBootstra
     }
 
     private void onHitBlock(ServerPlayerEntity player, BlockPos pos) {
-        ServerWorld world = player.getWorld();
+        ServerWorld world = player.getEntityWorld();
         BlockState state = world.getBlockState(pos);
         ItemStack stack = player.getMainHandStack();
 

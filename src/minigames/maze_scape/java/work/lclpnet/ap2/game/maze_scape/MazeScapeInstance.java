@@ -5,6 +5,9 @@ import net.minecraft.block.ShapeContext;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.damage.DamageTypes;
+import net.minecraft.entity.effect.StatusEffectInstance;
+import net.minecraft.entity.effect.StatusEffects;
+import net.minecraft.entity.player.PlayerAbilities;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.function.BooleanBiFunction;
@@ -84,6 +87,11 @@ public class MazeScapeInstance extends EliminationGameInstance implements MapBoo
         var setup = new MSLoader(world, map, logger);
 
         return setup.load().thenCompose(res -> {
+            if (MSLoader.DEBUG_PIECES) {
+                struct = null;
+                return CompletableFuture.completedFuture(null);
+            }
+
             long seed = new Random().nextLong();
             var random = new Random(seed);
 
@@ -95,6 +103,17 @@ public class MazeScapeInstance extends EliminationGameInstance implements MapBoo
 
     @Override
     protected void prepare() {
+        if (MSLoader.DEBUG_PIECES) {
+            for (ServerPlayerEntity player : gameHandle.getParticipants()) {
+                PlayerAbilities abilities = player.getAbilities();
+                abilities.allowFlying = true;
+                abilities.flying = true;
+                player.sendAbilitiesUpdate();
+                player.addStatusEffect(new StatusEffectInstance(StatusEffects.NIGHT_VISION, Integer.MAX_VALUE, 0, false, false, false));
+            }
+            return;
+        }
+
         if (struct == null) {
             gameHandle.getLogger().error("Failed to generate structure graph. Aborting the mini-game...");
             gameHandle.complete(MiniGameResults.EMPTY);
@@ -122,7 +141,9 @@ public class MazeScapeInstance extends EliminationGameInstance implements MapBoo
     }
 
     @Override
-    protected void ready() {
+    protected void go() {
+        if (MSLoader.DEBUG_PIECES) return;
+
         ServerWorld world = getWorld();
         Participants participants = gameHandle.getParticipants();
 
@@ -131,7 +152,7 @@ public class MazeScapeInstance extends EliminationGameInstance implements MapBoo
 
         manager.init(gameHandle);
 
-        TaskScheduler scheduler = gameHandle.getGameScheduler();
+        TaskScheduler scheduler = gameHandle.getScheduler();
         scheduler.interval(manager::updateMobs, MOB_UPDATE_DELAY_TICKS, MOB_SPAWN_DELAY_TICKS);
         scheduler.interval(manager::tick, 1);
         scheduler.interval(this::checkPits, 1);
@@ -196,7 +217,7 @@ public class MazeScapeInstance extends EliminationGameInstance implements MapBoo
     private void checkInPit(ServerPlayerEntity player) {
         if (struct == null) return;
 
-        var node = struct.nodeAt(player.getPos());
+        var node = struct.nodeAt(player.getEntityPos());
 
         if (node == null) return;
 

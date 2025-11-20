@@ -42,7 +42,6 @@ import work.lclpnet.ap2.impl.game.data.type.PlayerRef;
 import work.lclpnet.ap2.impl.game.kit.KitHandler;
 import work.lclpnet.ap2.impl.map.MapUtil;
 import work.lclpnet.ap2.impl.util.Fireworks;
-import work.lclpnet.ap2.impl.util.SplinePath;
 import work.lclpnet.ap2.impl.util.TimeHelper;
 import work.lclpnet.ap2.impl.util.debug.SplinePathDebugger;
 import work.lclpnet.ap2.impl.util.handler.VisibilityHandler;
@@ -51,6 +50,7 @@ import work.lclpnet.ap2.impl.util.movement.SimpleMovementBlocker;
 import work.lclpnet.ap2.impl.util.scoreboard.CustomScoreboardManager;
 import work.lclpnet.ap2.impl.util.world.ChunkPersistence;
 import work.lclpnet.ap2.impl.util.world.block_shape.BlockShape;
+import work.lclpnet.gaco.math.SplinePath;
 import work.lclpnet.kibu.access.misc.DamageTrackerAccess;
 import work.lclpnet.kibu.hook.entity.EntityHealthCallback;
 import work.lclpnet.kibu.hook.entity.PlayerInteractionHooks;
@@ -104,7 +104,7 @@ public class DragonEscapeInstance extends FFAGameInstance {
     public DragonEscapeInstance(MiniGameHandle gameHandle) {
         super(gameHandle);
 
-        movementBlocker = new SimpleMovementBlocker(gameHandle.getGameScheduler());
+        movementBlocker = new SimpleMovementBlocker(gameHandle.getScheduler());
         movementBlocker.setModifySpeedAttribute(false);
 
         useOldCombat();
@@ -147,7 +147,7 @@ public class DragonEscapeInstance extends FFAGameInstance {
         JSONArray keypointsJson = props.getJSONArray("dragon-path");
         Logger logger = gameHandle.getLogger();
 
-        var path = SplinePath.readCentered(keypointsJson, logger).orElse(null);
+        var path = MapUtil.readSplinePath(keypointsJson, logger).orElse(null);
 
         if (path == null) {
             logger.error("Failed to create dragon path, aborting game...");
@@ -180,12 +180,12 @@ public class DragonEscapeInstance extends FFAGameInstance {
         );
 
         dragonController.spawnDragon();
-        dragonController.init(gameHandle.getGameScheduler());
+        dragonController.init(gameHandle.getScheduler());
     }
 
     private void setupTrackers() {
         for (ServerPlayerEntity player : gameHandle.getParticipants()) {
-            Vec3d anchor = path.getNearestPosition(player.getPos());
+            Vec3d anchor = path.getNearestPosition(player.getEntityPos());
 
             trackers.put(player.getUuid(), new Tracker(anchor));
         }
@@ -245,7 +245,7 @@ public class DragonEscapeInstance extends FFAGameInstance {
         debugger.renderLiveProgress(() -> Stream.concat(
                 pseudoElimination.streamParticipants(),
                 dragonController.dragon().stream()
-        ).toList(), gameHandle.getGameScheduler());
+        ).toList(), gameHandle.getScheduler());
     }
 
     private void teleportPlayers() {
@@ -313,12 +313,13 @@ public class DragonEscapeInstance extends FFAGameInstance {
     }
 
     @Override
-    protected void ready() {
+    protected void go() {
         gameHandle.protect(config -> {
             config.allow(ProtectionTypes.ALLOW_DAMAGE, (entity, source) -> {
                 if (!(entity instanceof ServerPlayerEntity player)
                         || !gameHandle.getParticipants().isParticipating(player)
-                        || inGoal.contains(player.getUuid())) {
+                        || inGoal.contains(player.getUuid())
+                        || source.getAttacker() instanceof ServerPlayerEntity) {
                     return false;
                 }
 
@@ -339,9 +340,9 @@ public class DragonEscapeInstance extends FFAGameInstance {
         setupSmoothDeath();
         unblockMovement();
 
-        dragonController.startMoving(gameHandle.getGameScheduler());
+        dragonController.startMoving(gameHandle.getScheduler());
 
-        gameHandle.getGameScheduler().interval(this::tick, 1);
+        gameHandle.getScheduler().interval(this::tick, 1);
 
         startMs = milliTime();
         itemUseAllowed = true;
@@ -380,7 +381,7 @@ public class DragonEscapeInstance extends FFAGameInstance {
         boolean check = checkForCompletion;
 
         for (ServerPlayerEntity player : pseudoElimination.iterateParticipants()) {
-            if (goalShape.contains(player.getPos()) && !inGoal.contains(player.getUuid()) && OnGroundDetector.isOnGroundServer(player)) {
+            if (goalShape.contains(player.getEntityPos()) && !inGoal.contains(player.getUuid()) && OnGroundDetector.isOnGroundServer(player)) {
                 onReachGoal(player);
 
                 check = true;
@@ -394,7 +395,7 @@ public class DragonEscapeInstance extends FFAGameInstance {
 
             // eliminate the player if they are behind the dragon or not in range of the path
             if ((pseudoElimination.isParticipating(player) && progress <= dragonController.getDragonProgress())
-                    || !player.getPos().isInRange(path.samplePosition(progress), pathEliminationDistance)) {
+                    || !player.getEntityPos().isInRange(path.samplePosition(progress), pathEliminationDistance)) {
 
                 softEliminate(player);
                 check = true;
@@ -471,7 +472,7 @@ public class DragonEscapeInstance extends FFAGameInstance {
     }
 
     private double getProgress(ServerPlayerEntity player) {
-        return path.getProgress(player.getPos());
+        return path.getProgress(player.getEntityPos());
     }
 
     private synchronized double getDistance(ServerPlayerEntity player) {

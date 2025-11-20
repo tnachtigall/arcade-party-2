@@ -4,7 +4,7 @@ import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.math.Vec3d;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
-import work.lclpnet.ap2.impl.util.BlockBox;
+import work.lclpnet.gaco.ds.BlockBox;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -23,7 +23,7 @@ public class MovementTracker {
     }
 
     public void track(ServerPlayerEntity player) {
-        getEntry(player).update(player.getPos());
+        getEntry(player).update(player.getEntityPos());
     }
 
     @Nullable

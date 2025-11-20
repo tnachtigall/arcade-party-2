@@ -3,8 +3,8 @@ package work.lclpnet.ap2.game.red_light_green_light;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.util.PlayerInput;
 import net.minecraft.util.math.Vec3d;
-import work.lclpnet.ap2.api.util.action.PlayerAction;
 import work.lclpnet.ap2.impl.util.movement.MovementListener;
+import work.lclpnet.gaco.collisions.util.PlayerAction;
 import work.lclpnet.kibu.hook.Hook;
 import work.lclpnet.kibu.hook.HookRegistrar;
 import work.lclpnet.kibu.hook.player.PlayerConnectionHooks;
@@ -37,7 +37,7 @@ class RLGLMovementDetector {
     }
 
     public void fixPosition(ServerPlayerEntity player) {
-        fixed.put(player.getUuid(), player.getPos());
+        fixed.put(player.getUuid(), player.getEntityPos());
 
         if (MovementListener.isMovementInput(player.getPlayerInput())) {
             hook.invoker().act(player);

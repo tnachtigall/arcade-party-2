@@ -23,12 +23,12 @@ import work.lclpnet.ap2.api.game.GameInfo;
 import work.lclpnet.ap2.api.game.MiniGameHandle;
 import work.lclpnet.ap2.impl.game.EliminationGameInstance;
 import work.lclpnet.ap2.impl.map.MapUtil;
-import work.lclpnet.ap2.impl.util.BlockBox;
 import work.lclpnet.ap2.impl.util.bossbar.DynamicTranslatedBossBar;
 import work.lclpnet.ap2.impl.util.handler.Visibility;
 import work.lclpnet.ap2.impl.util.handler.VisibilityHandler;
 import work.lclpnet.ap2.impl.util.handler.VisibilityManager;
 import work.lclpnet.ap2.impl.util.scoreboard.CustomScoreboardManager;
+import work.lclpnet.gaco.ds.BlockBox;
 import work.lclpnet.kibu.access.VelocityModifier;
 import work.lclpnet.kibu.access.entity.FallingBlockAccess;
 import work.lclpnet.kibu.hook.player.PlayerMoveCallback;
@@ -81,7 +81,7 @@ public class AnvilFallInstance extends EliminationGameInstance {
     }
 
     @Override
-    protected void ready() {
+    protected void go() {
         gameHandle.protect(config -> config.allow(ProtectionTypes.ALLOW_DAMAGE, (entity, damageSource) -> {
             if (damageSource.isOf(DamageTypes.FALLING_ANVIL) && entity instanceof ServerPlayerEntity serverPlayer) {
                 onHitByAnvil(serverPlayer);
@@ -96,7 +96,7 @@ public class AnvilFallInstance extends EliminationGameInstance {
         gameHandle.getHooks().registerHook(PlayerMoveCallback.HOOK, this::onPlayerMove);
 
         for (ServerPlayerEntity player : gameHandle.getParticipants()) {
-            repelPlayer(player, player.getPos());
+            repelPlayer(player, player.getEntityPos());
         }
     }
 
@@ -124,8 +124,8 @@ public class AnvilFallInstance extends EliminationGameInstance {
     private void onHitByAnvil(ServerPlayerEntity player) {
         if (!gameHandle.getParticipants().isParticipating(player)) return;
 
-        ServerWorld world = player.getWorld();
-        Vec3d pos = player.getPos();
+        ServerWorld world = player.getEntityWorld();
+        Vec3d pos = player.getEntityPos();
 
         double x = pos.getX(), y = pos.getY(), z = pos.getZ();
 
@@ -151,7 +151,7 @@ public class AnvilFallInstance extends EliminationGameInstance {
     private void startAnvilSpawning() {
         amountDisplay.setArgument(0, FormatWrapper.styled(20 / INITIAL_DELAY, Formatting.YELLOW));
 
-        gameHandle.getGameScheduler().interval(new Runnable() {
+        gameHandle.getScheduler().interval(new Runnable() {
             int delay = INITIAL_DELAY;
             int cooldown = 0;
             int anvilAmount = 1;

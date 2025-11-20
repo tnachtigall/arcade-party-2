@@ -23,10 +23,10 @@ import work.lclpnet.ap2.impl.game.FFAGameInstance;
 import work.lclpnet.ap2.impl.game.data.OrderedDataContainer;
 import work.lclpnet.ap2.impl.game.data.type.PlayerRef;
 import work.lclpnet.ap2.impl.map.MapUtil;
-import work.lclpnet.ap2.impl.util.BlockBox;
 import work.lclpnet.ap2.impl.util.Fireworks;
 import work.lclpnet.ap2.impl.util.movement.SimpleMovementBlocker;
 import work.lclpnet.ap2.impl.util.scoreboard.CustomScoreboardManager;
+import work.lclpnet.gaco.ds.BlockBox;
 import work.lclpnet.kibu.hook.HookRegistrar;
 import work.lclpnet.kibu.hook.player.PlayerMoveCallback;
 import work.lclpnet.kibu.scheduler.Ticks;
@@ -66,7 +66,7 @@ public class RedLightGreenLightInstance extends FFAGameInstance implements Runna
 
     public RedLightGreenLightInstance(MiniGameHandle gameHandle) {
         super(gameHandle);
-        movementBlocker = new SimpleMovementBlocker(gameHandle.getGameScheduler());
+        movementBlocker = new SimpleMovementBlocker(gameHandle.getScheduler());
     }
 
     @Override
@@ -104,7 +104,7 @@ public class RedLightGreenLightInstance extends FFAGameInstance implements Runna
     }
 
     @Override
-    protected void ready() {
+    protected void go() {
         HookRegistrar hooks = gameHandle.getHooks();
 
         movementDetector.register(this::onMovedWhileRed);
@@ -119,7 +119,7 @@ public class RedLightGreenLightInstance extends FFAGameInstance implements Runna
         scheduleNextStop();
         setStatus(TrafficLight.Status.GREEN);
 
-        gameHandle.getGameScheduler().interval(this, 1);
+        gameHandle.getScheduler().interval(this, 1);
     }
 
     private void readTrafficLights() {
@@ -209,11 +209,11 @@ public class RedLightGreenLightInstance extends FFAGameInstance implements Runna
     }
 
     private void onMove(ServerPlayerEntity player) {
-        if (timer <= 0 || inGoal.contains(player.getUuid())) return;
+        if (timer <= 0 || inGoal.contains(player.getUuid()) || !gameHandle.getParticipants().isParticipating(player)) return;
 
         tracker.track(player);
 
-        if (goal.contains(player.getPos())) {
+        if (goal.contains(player.getEntityPos())) {
             onGoalReached(player);
         }
     }
@@ -339,7 +339,7 @@ public class RedLightGreenLightInstance extends FFAGameInstance implements Runna
         gameHandle.getParticipants().stream()
                 .filter(player -> !inGoal.contains(player.getUuid()))
                 .map(player -> {
-                    double distanceSq = goal.squaredDistanceTo(player.getPos());
+                    double distanceSq = goal.squaredDistanceTo(player.getEntityPos());
                     return new Grade(player, Math.sqrt(distanceSq));
                 })
                 .sorted(Comparator.comparingDouble(Grade::distance))

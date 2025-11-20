@@ -23,10 +23,10 @@ import work.lclpnet.ap2.api.game.MiniGameHandle;
 import work.lclpnet.ap2.game.knockout.util.ImpactDetector;
 import work.lclpnet.ap2.impl.actor.GravityFieldActor;
 import work.lclpnet.ap2.impl.game.EliminationGameInstance;
-import work.lclpnet.ap2.impl.util.collision.ChunkedCollisionDetector;
-import work.lclpnet.ap2.impl.util.collision.PlayerMovementObserver;
 import work.lclpnet.ap2.impl.util.world.CombatIdleManager;
 import work.lclpnet.ap2.impl.util.world.DestroyStageManager;
+import work.lclpnet.gaco.collisions.ChunkedCollisionDetector;
+import work.lclpnet.gaco.collisions.movement.PlayerMovementObserver;
 import work.lclpnet.kibu.access.VelocityModifier;
 import work.lclpnet.kibu.hook.HookRegistrar;
 import work.lclpnet.kibu.hook.entity.EntityDamageCallback;
@@ -96,11 +96,11 @@ public class KnockoutInstance extends EliminationGameInstance {
     }
 
     @Override
-    protected void ready() {
+    protected void go() {
         gameHandle.protect(config -> config.allow(ProtectionTypes.ALLOW_DAMAGE, this::canDamage));
 
         HookRegistrar hooks = gameHandle.getHooks();
-        TaskScheduler scheduler = gameHandle.getGameScheduler();
+        TaskScheduler scheduler = gameHandle.getScheduler();
         Participants participants = gameHandle.getParticipants();
 
         hooks.registerHook(EntityDamageCallback.HOOK, (entity, source, damage) -> {
@@ -135,7 +135,7 @@ public class KnockoutInstance extends EliminationGameInstance {
                     .formatted(YELLOW)
                     .sendTo(player);
 
-            player.getWorld().spawnParticles(ParticleTypes.WITCH, player.getX(), player.getY(), player.getZ(), 50, 0.5, 1.0, 0.5, 0.1);
+            player.getEntityWorld().spawnParticles(ParticleTypes.WITCH, player.getX(), player.getY(), player.getZ(), 50, 0.5, 1.0, 0.5, 0.1);
             player.playSoundToPlayer(SoundEvents.ENTITY_ZOMBIE_VILLAGER_CONVERTED, SoundCategory.PLAYERS, 0.8f, 1f);
             player.addStatusEffect(new StatusEffectInstance(StatusEffects.GLOWING, Integer.MAX_VALUE, 1, false, false, true));
         });
@@ -175,7 +175,7 @@ public class KnockoutInstance extends EliminationGameInstance {
     }
 
     private void beginCrumble() {
-        crumble.start(gameHandle.getGameScheduler());
+        crumble.start(gameHandle.getScheduler());
     }
 
     private boolean canDamage(Entity entity, DamageSource source) {
@@ -195,13 +195,13 @@ public class KnockoutInstance extends EliminationGameInstance {
             hit.put(player.getUuid(), true);
         }
 
-        Vec3d vec = player.getPos().subtract(attacker.getPos()).normalize();
+        Vec3d vec = player.getEntityPos().subtract(attacker.getEntityPos()).normalize();
         vec = new Vec3d(vec.getX(), 0.1, vec.getZ());
         vec = vec.multiply(power);
 
         VelocityModifier.setVelocity(player, vec);
 
-        ServerWorld world = player.getWorld();
+        ServerWorld world = player.getEntityWorld();
 
         double x = player.getX(), y = player.getY(), z = player.getZ();
         world.spawnParticles(ParticleTypes.CLOUD, x, y, z, 25, 0.25, 0.25, 0.25, 0.1);

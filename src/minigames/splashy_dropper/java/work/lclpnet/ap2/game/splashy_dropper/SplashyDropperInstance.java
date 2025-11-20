@@ -27,7 +27,6 @@ import work.lclpnet.ap2.impl.game.data.DataContainers;
 import work.lclpnet.ap2.impl.game.data.IntDataContainer;
 import work.lclpnet.ap2.impl.game.data.type.PlayerRef;
 import work.lclpnet.ap2.impl.map.ServerThreadMapBootstrap;
-import work.lclpnet.ap2.impl.util.collision.GroundDetector;
 import work.lclpnet.ap2.impl.util.handler.Visibility;
 import work.lclpnet.ap2.impl.util.handler.VisibilityHandler;
 import work.lclpnet.ap2.impl.util.handler.VisibilityManager;
@@ -36,6 +35,7 @@ import work.lclpnet.ap2.impl.util.scoreboard.CustomScoreboardManager;
 import work.lclpnet.ap2.impl.util.world.BfsWorldScanner;
 import work.lclpnet.ap2.impl.util.world.SimpleAdjacentBlocks;
 import work.lclpnet.combatctl.impl.CombatStyles;
+import work.lclpnet.gaco.collisions.util.GroundDetector;
 import work.lclpnet.kibu.hook.HookRegistrar;
 import work.lclpnet.kibu.hook.util.PositionRotation;
 import work.lclpnet.kibu.translate.Translations;
@@ -63,7 +63,7 @@ public class SplashyDropperInstance extends FFAGameInstance implements MapBootst
 
         data = DataContainers.finaleCompatibleScoreContainer(gameHandle, PlayerRef::create);
 
-        movementBlocker = new SimpleMovementBlocker(gameHandle.getScheduler());
+        movementBlocker = new SimpleMovementBlocker(gameHandle.getRootScheduler());
         movementBlocker.setModifySpeedAttribute(false);
 
         gameHandle.getPlayerUtil().setDefaultCombatStyle(CombatStyles.CLASSIC
@@ -114,14 +114,14 @@ public class SplashyDropperInstance extends FFAGameInstance implements MapBootst
     }
 
     @Override
-    protected void ready() {
+    protected void go() {
         Translations translations = gameHandle.getTranslations();
         var subject = translations.translateText(gameHandle.getGameInfo().getTaskKey());
 
         int duration = MIN_DURATION_SECONDS + random.nextInt(MAX_DURATION_SECONDS - MIN_DURATION_SECONDS + 1);
         commons().createTimer(subject, duration).whenDone(winManager::complete);
 
-        gameHandle.getGameScheduler().interval(this::tick, 1);
+        gameHandle.getScheduler().interval(this::tick, 1);
 
         for (ServerPlayerEntity player : gameHandle.getParticipants()) {
             movementBlocker.enableMovement(player);
@@ -160,7 +160,7 @@ public class SplashyDropperInstance extends FFAGameInstance implements MapBootst
         ServerWorld world = getWorld();
 
         outer: for (ServerPlayerEntity player : gameHandle.getParticipants()) {
-            if (player.getY() >= minSpawnY) continue;
+            if (player.getY() >= minSpawnY - 1) continue;
 
             if (world.getFluidState(player.getBlockPos()).isIn(FluidTags.WATER)) {
                 onLandInWater(player);
@@ -196,7 +196,7 @@ public class SplashyDropperInstance extends FFAGameInstance implements MapBootst
             default -> 1.4f;
         };
 
-        gameHandle.getGameScheduler().immediate(() -> player.playSoundToPlayer(SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, SoundCategory.PLAYERS, 0.5f, pitch));
+        gameHandle.getScheduler().immediate(() -> player.playSoundToPlayer(SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, SoundCategory.PLAYERS, 0.5f, pitch));
 
         commons().teleportToRandomSpawn(player, random);
     }
@@ -204,9 +204,7 @@ public class SplashyDropperInstance extends FFAGameInstance implements MapBootst
     private void onHitGround(ServerPlayerEntity player) {
         commons().teleportToRandomSpawn(player, random);
 
-        commons().teleportToRandomSpawn(player, random);
-
-        gameHandle.getGameScheduler().immediate(() -> player.playSoundToPlayer(SoundEvents.ENTITY_ZOMBIE_ATTACK_IRON_DOOR, SoundCategory.PLAYERS, 0.25f, 0.5f));
+        gameHandle.getScheduler().immediate(() -> player.playSoundToPlayer(SoundEvents.ENTITY_ZOMBIE_ATTACK_IRON_DOOR, SoundCategory.PLAYERS, 0.25f, 0.5f));
     }
 
     private int removeWater(BlockPos pos) {

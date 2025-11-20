@@ -19,10 +19,10 @@ import work.lclpnet.ap2.core.hook.DeathMessageItemCallback;
 import work.lclpnet.ap2.game.paintball.util.*;
 import work.lclpnet.ap2.impl.game.item.SpecialItem;
 import work.lclpnet.ap2.impl.game.item.SpecialItemContext;
-import work.lclpnet.ap2.impl.scene.Scene;
-import work.lclpnet.ap2.impl.scene.animation.AnimationContext;
-import work.lclpnet.ap2.impl.scene.simulation.SceneRigidBody;
 import work.lclpnet.ap2.impl.util.math.MathUtil;
+import work.lclpnet.gaco.scene.Scene;
+import work.lclpnet.gaco.scene.animation.AnimationContext;
+import work.lclpnet.gaco.scene.physics.SceneRigidBody;
 import work.lclpnet.kibu.hook.HookRegistrar;
 import work.lclpnet.kibu.physics.impl.bullet.thread.PhysicsThread;
 
@@ -30,8 +30,8 @@ import java.util.Random;
 import java.util.UUID;
 
 import static work.lclpnet.ap2.impl.util.SoundHelper.playSound;
-import static work.lclpnet.ap2.impl.util.ThreadUtil.executeOn;
 import static work.lclpnet.ap2.impl.util.math.MathUtil.randomUnitVec3d;
+import static work.lclpnet.gaco.core.util.ThreadUtil.executeOn;
 import static work.lclpnet.kibu.physics.impl.bullet.math.Convert.toBullet;
 
 public class InkGrenadeItem implements SpecialItem {
@@ -85,7 +85,7 @@ public class InkGrenadeItem implements SpecialItem {
     }
 
     private void throwInkGrenade(ServerPlayerEntity player, ItemStack stack) {
-        ServerWorld world = player.getWorld();
+        ServerWorld world = player.getEntityWorld();
 
         executeOn(PhysicsThread.get(world), () -> spawnObject(player));
 
@@ -98,7 +98,7 @@ public class InkGrenadeItem implements SpecialItem {
         Vec3d dir = player.getRotationVector();
         Vec3d pos = paintGunManager.getProjectileSpawn(player, dir, SIZE);
 
-        var obj = new InkGrenadeObject(scene, player.getWorld());
+        var obj = new InkGrenadeObject(scene, player.getEntityWorld());
         obj.position.set(pos.getX(), pos.getY(), pos.getZ());
         obj.scale.set(SIZE);
         obj.setThrower(player.getUuid());

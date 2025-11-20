@@ -28,7 +28,6 @@ import work.lclpnet.ap2.*
 import work.lclpnet.ap2.api.game.MiniGameHandle
 import work.lclpnet.ap2.api.map.MapBootstrapFunction
 import work.lclpnet.ap2.api.util.world.BlockPredicate
-import work.lclpnet.ap2.impl.ds.StructureMask
 import work.lclpnet.ap2.impl.game.FFAGameInstance
 import work.lclpnet.ap2.impl.game.data.OrderedDataContainer
 import work.lclpnet.ap2.impl.game.data.type.PlayerRef
@@ -43,8 +42,9 @@ import work.lclpnet.ap2.impl.util.world.BfsWorldScanner
 import work.lclpnet.ap2.impl.util.world.SimpleAdjacentBlocks
 import work.lclpnet.ap2.impl.util.world.WalkableBlockPredicate
 import work.lclpnet.ap2.impl.util.world.block_shape.BlockShape
-import work.lclpnet.ap2.impl.util.world.entity.DynamicEntityManager
-import work.lclpnet.ap2.impl.util.world.entity.PlayerSpecificDynamicEntity
+import work.lclpnet.gaco.ds.StructureMask
+import work.lclpnet.gaco.dynamic_entities.DynamicEntityManager
+import work.lclpnet.gaco.dynamic_entities.PlayerSpecificDynamicEntity
 import work.lclpnet.kibu.hook.world.PressurePlateCallback
 import work.lclpnet.kibu.scheduler.Ticks
 import work.lclpnet.kibu.translate.bossbar.TranslatedBossBar
@@ -148,7 +148,7 @@ class MinefieldInstance(gameHandle: MiniGameHandle) : FFAGameInstance(gameHandle
         setupTeam()
 
         dynamicEntityManager = DynamicEntityManager(world)
-        dynamicEntityManager!!.init(gameHandle.gameScheduler, gameHandle.hooks)
+        dynamicEntityManager!!.init(gameHandle.scheduler, gameHandle.hooks)
     }
 
     fun setupTeam() {
@@ -165,7 +165,7 @@ class MinefieldInstance(gameHandle: MiniGameHandle) : FFAGameInstance(gameHandle
         visibility!!.giveItems()
     }
 
-    override fun ready() {
+    override fun go() {
         world.setBlocks(readShape("spawn-gate"), Blocks.AIR)
 
         interval(1) {
@@ -174,7 +174,7 @@ class MinefieldInstance(gameHandle: MiniGameHandle) : FFAGameInstance(gameHandle
 
                 entry(player).update(player)
 
-                if (goalShape!!.contains(player.pos)) {
+                if (goalShape!!.contains(player.entityPos)) {
                     onReachGoal(player)
                 }
             }
@@ -210,7 +210,7 @@ class MinefieldInstance(gameHandle: MiniGameHandle) : FFAGameInstance(gameHandle
     fun entry(player: ServerPlayerEntity): Entry = entries.computeIfAbsent(player.uuid) { Entry() }
 
     fun onReachGoal(player: ServerPlayerEntity) {
-        if (!inGoal.add(player.uuid)) return
+        if (!inGoal.add(player.uuid) || !players().isParticipating(player)) return
 
         data.add(player)
         entry(player).done()
@@ -279,7 +279,7 @@ class MinefieldInstance(gameHandle: MiniGameHandle) : FFAGameInstance(gameHandle
         var markerDist = Double.MAX_VALUE
 
         fun update(player: ServerPlayerEntity) {
-            val pos = player.pos
+            val pos = player.entityPos
             val dist = sqrt(goalShape!!.bounds().squaredDistanceTo(pos)).coerceAtMost(goalDistance!!)
 
             if (dist >= this.bestDist) return

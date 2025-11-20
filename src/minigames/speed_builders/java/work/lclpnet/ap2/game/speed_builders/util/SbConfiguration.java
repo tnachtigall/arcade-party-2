@@ -88,7 +88,7 @@ public class SbConfiguration {
     }
 
     public void registerHooks() {
-        HookRegistrar hooks = gameHandle.getHookRegistrar();
+        HookRegistrar hooks = gameHandle.getHooks();
 
         hooks.registerHook(PlayerInteractionHooks.ATTACK_BLOCK, (player, world, hand, pos, direction) -> {
             if (player instanceof ServerPlayerEntity serverPlayer && canModify(serverPlayer, pos) && world instanceof ServerWorld serverWorld) {
@@ -208,7 +208,7 @@ public class SbConfiguration {
     }
 
     private void destroyBlockDelayed(ServerWorld world, BlockPos pos, ServerPlayerEntity player) {
-        gameHandle.getGameScheduler().timeout(() -> {
+        gameHandle.getScheduler().timeout(() -> {
             BlockState state = world.getBlockState(pos);
 
             if (state.isAir()) return;

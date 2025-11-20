@@ -32,15 +32,17 @@ import net.minecraft.world.GameRules;
 import org.json.JSONArray;
 import work.lclpnet.ap2.api.game.MiniGameHandle;
 import work.lclpnet.ap2.api.game.data.DataContainer;
+import work.lclpnet.ap2.api.stats.FFAStatsManager;
+import work.lclpnet.ap2.api.stats.Stat;
 import work.lclpnet.ap2.core.type.ApVariantHolder;
 import work.lclpnet.ap2.impl.game.FFAGameInstance;
 import work.lclpnet.ap2.impl.game.data.DataContainers;
 import work.lclpnet.ap2.impl.game.data.IntDataContainer;
 import work.lclpnet.ap2.impl.game.data.type.PlayerRef;
 import work.lclpnet.ap2.impl.map.MapUtil;
-import work.lclpnet.ap2.impl.util.BlockBox;
 import work.lclpnet.ap2.impl.util.ItemHelper;
 import work.lclpnet.ap2.impl.util.scoreboard.CustomScoreboardManager;
+import work.lclpnet.gaco.ds.BlockBox;
 import work.lclpnet.kibu.access.entity.PlayerInventoryAccess;
 import work.lclpnet.kibu.hook.HookRegistrar;
 import work.lclpnet.kibu.hook.entity.ProjectileCanHitCallback;
@@ -54,17 +56,22 @@ import java.util.Random;
 import java.util.Set;
 
 import static net.minecraft.util.Formatting.YELLOW;
+import static work.lclpnet.ap2.api.stats.CommonStats.SCORE;
 import static work.lclpnet.ap2.impl.util.ItemHelper.unbreakable;
 
 public class ChickenShooterInstance extends FFAGameInstance implements Runnable {
 
     private static final double BABY_CHANCE = 0.15;
     private static final double TNT_CHANCE = 0.07;
-    private static final double TNT_RADIUS = 6;
-    private static final int MIN_DURATION = 40;
-    private static final int MAX_DURATION = 60;
+    private static final double TNT_RADIUS = 7.5;
+    private static final int DURATION_SECONDS = 50;
+
+    private static final Stat<Integer> BABY_CHICKENS = new Stat<>("baby_chickens", 0);
+    private static final Stat<Integer> TNT_DETONATED = new Stat<>("tnt_detonated", 0);
+    private static final Stat<Integer> CHICKENS_EXPLODED = new Stat<>("chickens_exploded", 0);
+
+    private final FFAStatsManager stats;
     private final Random random = new Random();
-    private final int durationSeconds = MIN_DURATION + random.nextInt(MAX_DURATION - MIN_DURATION + 1);
     private final IntDataContainer<ServerPlayerEntity, PlayerRef> data;
     private final Set<ChickenEntity> chickenSet = new HashSet<>();
     private BlockBox chickenBox = null;
@@ -76,6 +83,7 @@ public class ChickenShooterInstance extends FFAGameInstance implements Runnable 
         super(gameHandle);
 
         data = DataContainers.finaleCompatibleScoreContainer(gameHandle, PlayerRef::create);
+        stats = createStats(data, SCORE, BABY_CHICKENS, TNT_DETONATED, CHICKENS_EXPLODED);
     }
 
     @Override
@@ -144,7 +152,7 @@ public class ChickenShooterInstance extends FFAGameInstance implements Runnable 
     }
 
     @Override
-    protected void ready() {
+    protected void go() {
         gameHandle.protect(config -> config.allow(ProtectionTypes.ALLOW_DAMAGE, (entity, damageSource)
                 -> damageSource.getSource() instanceof ProjectileEntity && entity instanceof ChickenEntity));
 
@@ -167,13 +175,13 @@ public class ChickenShooterInstance extends FFAGameInstance implements Runnable 
         // Timer and game end
         var subject = translations.translateText("game.ap2.chicken_shooter.task");
 
-        commons().createTimer(subject, durationSeconds).whenDone(winManager::complete);
+        commons().createTimer(subject, DURATION_SECONDS).whenDone(winManager::complete);
     }
 
     private void chickenSpawner() {
         JSONArray spawnBounds = getMap().requireProperty("spawn-bounds");
         chickenBox = MapUtil.readBox(spawnBounds);
-        gameHandle.getGameScheduler().interval(this, 1);
+        gameHandle.getScheduler().interval(this, 1);
     }
 
     @SuppressWarnings("unchecked")
@@ -207,11 +215,13 @@ public class ChickenShooterInstance extends FFAGameInstance implements Runnable 
     private void spawnTNT(ChickenEntity chicken, ServerWorld world) {
         TntEntity tnt = new TntEntity(EntityType.TNT, world);
         tnt.setFuse(Integer.MAX_VALUE);
-        tnt.startRiding(chicken, true);
+        tnt.startRiding(chicken, true, false);
         world.spawnEntity(tnt);
     }
 
     private int killChicken(ChickenEntity chicken, ServerPlayerEntity attacker, ServerWorld world) {
+        if (chicken.isRemoved()) return 0;
+
         int score = 0;
 
         double x = chicken.getX();
@@ -226,11 +236,16 @@ public class ChickenShooterInstance extends FFAGameInstance implements Runnable 
         chickenSet.remove(chicken);
 
         if (tnt != null) {
+            stats.increment(attacker, TNT_DETONATED);
             score += tntExplode(chicken, tnt, world, attacker, x, y, z);
         }
 
-        if (chicken.isBaby()) score += 3;
-        else score += 1;
+        if (chicken.isBaby()) {
+            stats.increment(attacker, BABY_CHICKENS);
+            score += 3;
+        } else {
+            score += 1;
+        }
 
         return score;
     }
@@ -240,17 +255,22 @@ public class ChickenShooterInstance extends FFAGameInstance implements Runnable 
         attacker.playSoundToPlayer(SoundEvents.ENTITY_TNT_PRIMED, SoundCategory.PLAYERS, 0.8f, 1.8f);
         attacker.playSoundToPlayer(SoundEvents.ENTITY_GENERIC_EXPLODE.value(), SoundCategory.PLAYERS, 0.8f, 0.7f);
 
-        Vec3d tntPos = tnt.getPos();
+        Vec3d tntPos = tnt.getEntityPos();
 
         int score = 0;
-        var affected = world.getEntitiesByType(TypeFilter.instanceOf(ChickenEntity.class), chickenEntity -> tntPos.isInRange(chickenEntity.getPos(), TNT_RADIUS));
+        var affected = world.getEntitiesByType(TypeFilter.instanceOf(ChickenEntity.class), chickenEntity -> tntPos.isInRange(chickenEntity.getEntityPos(), TNT_RADIUS));
+        int count = 0;
 
         for (ChickenEntity c : affected) {
-            if (c == chicken) continue;
+            if (c == chicken || c.isRemoved()) continue;
+
+            count++;
             score += killChicken(c, attacker, world);
         }
 
         tnt.discard();
+
+        stats.increment(attacker, CHICKENS_EXPLODED, count);
 
         return score;
     }

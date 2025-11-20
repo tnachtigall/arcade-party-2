@@ -37,7 +37,6 @@ import work.lclpnet.ap2.impl.game.FFAGameInstance;
 import work.lclpnet.ap2.impl.game.data.IntScoreDataContainer;
 import work.lclpnet.ap2.impl.game.data.type.PlayerRef;
 import work.lclpnet.ap2.impl.map.MapUtil;
-import work.lclpnet.ap2.impl.util.BlockBox;
 import work.lclpnet.ap2.impl.util.bossbar.DynamicTranslatedPlayerBossBar;
 import work.lclpnet.ap2.impl.util.scoreboard.CustomScoreboardManager;
 import work.lclpnet.ap2.impl.util.scoreboard.TranslatedScoreboardObjective;
@@ -45,6 +44,7 @@ import work.lclpnet.ap2.impl.util.world.BfsWorldScanner;
 import work.lclpnet.ap2.impl.util.world.NotOccupiedBlockPredicate;
 import work.lclpnet.ap2.impl.util.world.SimpleAdjacentBlocks;
 import work.lclpnet.ap2.impl.util.world.SizedSpaceFinder;
+import work.lclpnet.gaco.ds.BlockBox;
 import work.lclpnet.kibu.access.entity.FireworkEntityAccess;
 import work.lclpnet.kibu.hook.HookRegistrar;
 import work.lclpnet.kibu.hook.entity.PlayerInteractionHooks;
@@ -84,7 +84,7 @@ public class PandaFinderInstance extends FFAGameInstance {
     }
 
     @Override
-    protected void ready() {
+    protected void go() {
         HookRegistrar hooks = gameHandle.getHooks();
 
         hooks.registerHook(PlayerInteractionHooks.USE_ENTITY, (player, world, hand, entity, hitResult) -> {
@@ -138,7 +138,7 @@ public class PandaFinderInstance extends FFAGameInstance {
             return;
         }
 
-        gameHandle.getGameScheduler().timeout(this::nextRound, Ticks.seconds(3));
+        gameHandle.getScheduler().timeout(this::nextRound, Ticks.seconds(3));
     }
 
     private void scanWorld() {

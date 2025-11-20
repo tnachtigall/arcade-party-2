@@ -14,7 +14,7 @@ import org.jetbrains.annotations.Nullable;
 import work.lclpnet.ap2.game.maze_scape.setup.MSDebugController;
 import work.lclpnet.ap2.game.maze_scape.util.MSStruct;
 import work.lclpnet.ap2.game.maze_scape.util.Passage;
-import work.lclpnet.ap2.impl.scene.Object3d;
+import work.lclpnet.gaco.scene.Object3d;
 import work.lclpnet.kibu.cmd.type.CommandRegistrar;
 import work.lclpnet.kibu.cmd.type.KibuCommand;
 
@@ -102,7 +102,7 @@ public class DebugPathCommand implements KibuCommand {
     private Passage getPassage(CommandContext<ServerCommandSource> ctx) throws CommandSyntaxException {
         ServerPlayerEntity player = ctx.getSource().getPlayerOrThrow();
 
-        Passage passage = struct.nearestPassageTo(player.getPos());
+        Passage passage = struct.nearestPassageTo(player.getEntityPos());
 
         if (passage == null) {
             throw NO_PASSAGE_FOUND.create();

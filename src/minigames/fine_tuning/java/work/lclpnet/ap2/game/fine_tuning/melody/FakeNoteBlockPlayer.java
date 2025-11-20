@@ -39,7 +39,7 @@ public class FakeNoteBlockPlayer {
         if (instrument.canBePitched()) {
             pitch = NoteBlock.getNotePitch(note);
 
-            player.getWorld().spawnParticles(player, ParticleTypes.NOTE, false, false,
+            player.getEntityWorld().spawnParticles(player, ParticleTypes.NOTE, false, false,
                     pos.getX() + 0.5d,
                     pos.getY() + 1.2d,
                     pos.getZ() + 0.5d,
@@ -53,6 +53,10 @@ public class FakeNoteBlockPlayer {
         }
 
         SoundHelper.playSound(player, instrument.getSound().value(), SoundCategory.RECORDS, x, y, z, 3f, pitch);
+    }
+
+    public BlockPos getNoteBlock(int index) {
+        return noteBlocks[index];
     }
 
     public void setMelody(Melody melody) {

@@ -20,15 +20,15 @@ import work.lclpnet.ap2.api.game.team.Team;
 import work.lclpnet.ap2.api.game.team.TeamKey;
 import work.lclpnet.ap2.api.game.team.TeamManager;
 import work.lclpnet.ap2.api.map.MapBootstrap;
-import work.lclpnet.ap2.api.util.CollisionDetector;
 import work.lclpnet.ap2.game.cozy_campfire.setup.*;
 import work.lclpnet.ap2.impl.game.TeamEliminationGameInstance;
 import work.lclpnet.ap2.impl.util.TeamStorage;
 import work.lclpnet.ap2.impl.util.TimeHelper;
 import work.lclpnet.ap2.impl.util.bossbar.DynamicTranslatedPlayerBossBar;
 import work.lclpnet.ap2.impl.util.bossbar.DynamicTranslatedTeamBossBar;
-import work.lclpnet.ap2.impl.util.collision.ChunkedCollisionDetector;
-import work.lclpnet.ap2.impl.util.collision.PlayerMovementObserver;
+import work.lclpnet.gaco.collisions.ChunkedCollisionDetector;
+import work.lclpnet.gaco.collisions.CollisionDetector;
+import work.lclpnet.gaco.collisions.movement.PlayerMovementObserver;
 import work.lclpnet.kibu.hook.HookRegistrar;
 import work.lclpnet.kibu.translate.Translations;
 import work.lclpnet.kibu.translate.text.LocalizedFormat;
@@ -124,10 +124,10 @@ public class CozyCampfireInstance extends TeamEliminationGameInstance implements
     }
 
     @Override
-    protected void ready() {
+    protected void go() {
         gameHandle.protect(hookSetup::configure);
 
-        gameHandle.getGameScheduler().interval(this::tick, 1);
+        gameHandle.getScheduler().interval(this::tick, 1);
 
         baseManager.openDoors(getWorld());
     }
@@ -204,6 +204,7 @@ public class CozyCampfireInstance extends TeamEliminationGameInstance implements
             world.setWeather(0, 1000, true, thunder);
         } else {
             world.setWeather(1000, 0, false, false);
+            world.setRainGradient(0);
         }
     }
 
@@ -279,7 +280,7 @@ public class CozyCampfireInstance extends TeamEliminationGameInstance implements
 
         stack.setCount(0);
 
-        if (player.getWorld() instanceof ServerWorld world) {
+        if (player.getEntityWorld() instanceof ServerWorld world) {
             double x = pos.getX() + 0.5, y = pos.getY() + 0.5, z = pos.getZ();
 
             world.playSound(null, x, y, z, SoundEvents.BLOCK_FIRE_EXTINGUISH, SoundCategory.BLOCKS, 0.2f, 1f);

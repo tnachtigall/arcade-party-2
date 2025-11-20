@@ -29,13 +29,14 @@ import work.lclpnet.ap2.core.mixin.CreakingBrainAccessor;
 import work.lclpnet.ap2.core.mixin.WardenBrainAccessor;
 import work.lclpnet.ap2.core.type.ApEntity;
 import work.lclpnet.ap2.game.maze_scape.gen.Node;
+import work.lclpnet.ap2.game.maze_scape.monster.CreakingData;
 import work.lclpnet.ap2.game.maze_scape.monster.EndermanData;
 import work.lclpnet.ap2.game.maze_scape.monster.MonsterData;
 import work.lclpnet.ap2.game.maze_scape.monster.MonsterSpawner;
 import work.lclpnet.ap2.game.maze_scape.setup.MSDebugController;
-import work.lclpnet.ap2.game.maze_scape.setup.MSGenerator;
 import work.lclpnet.ap2.game.maze_scape.setup.OrientedStructurePiece;
 import work.lclpnet.ap2.impl.util.EntityUtil;
+import work.lclpnet.kibu.hook.util.PendingResult;
 import work.lclpnet.lobby.game.map.GameMap;
 
 import java.util.*;
@@ -54,7 +55,6 @@ public class MSManager {
     private final Random random;
     private final Logger logger;
     private final MSTargetManager targetManager;
-    private final int mapChunkRadius;
     private final MSDebugController debugController;
     private final Map<UUID, MonsterData<?>> monsters = new HashMap<>();
     private final MonsterSpawner spawner;
@@ -68,7 +68,6 @@ public class MSManager {
         this.debugController = debugController;
 
         targetManager = new MSTargetManager(struct, participants);
-        mapChunkRadius = MSGenerator.getMaxChunkSize(map);
         spawner = new MonsterSpawner(this, logger, random);
     }
 
@@ -93,6 +92,7 @@ public class MSManager {
         hooks.registerHook(EntityPathFindingCallback.HOOK, this::modifyPathFinding);
         hooks.registerHook(CobwebSlowCallback.HOOK, this::cancelCobwebSlow);
         hooks.registerHook(EntityAfterMoveCallback.HOOK, this::afterMoveTick);
+        hooks.registerHook(CreakingLookedAtCheckCallback.HOOK, this::isCreakingBeingLookedAt);
     }
 
     public void spawnMobs() {
@@ -148,7 +148,7 @@ public class MSManager {
                 .map(OrientedStructurePiece::spawn)
                 .stream()
                 .flatMapToDouble(nodeSpawn -> participants.stream()
-                        .flatMap(player -> struct.findPath(player.getPos(), nodeSpawn).stream())
+                        .flatMap(player -> struct.findPath(player.getEntityPos(), nodeSpawn).stream())
                         .mapToDouble(NavPath::length))
                 .min()
                 .ifPresent(minDist -> minDistances.put(node, minDist)));
@@ -175,10 +175,9 @@ public class MSManager {
     }
 
     private void initAttributes(LivingEntity entity) {
-        if (entity.getWorld() != world || !isMonsterType(entity)) return;
+        if (entity.getEntityWorld() != world || !isMonsterType(entity)) return;
 
-        // make sure monsters can track down players everywhere in the map
-        EntityUtil.setAttribute(entity, EntityAttributes.FOLLOW_RANGE, 2 * mapChunkRadius * 16);
+        EntityUtil.setAttribute(entity, EntityAttributes.FOLLOW_RANGE, 80);
     }
 
     private static boolean isMonsterType(LivingEntity entity) {
@@ -189,7 +188,7 @@ public class MSManager {
     }
 
     private @Nullable Brain<WardenEntity> createWardenBrain(WardenEntity warden, Supplier<Brain<WardenEntity>> brainSupplier) {
-        if (warden.getWorld() != world) return null;
+        if (warden.getEntityWorld() != world) return null;
 
         var brain = brainSupplier.get();
 
@@ -220,7 +219,7 @@ public class MSManager {
     }
 
     private @Nullable Brain<CreakingEntity> createCreakingBrain(CreakingEntity creaking, Supplier<Brain<CreakingEntity>> brainSupplier) {
-        if (creaking.getWorld() != world) return null;
+        if (creaking.getEntityWorld() != world) return null;
 
         var brain = brainSupplier.get();
 
@@ -263,7 +262,7 @@ public class MSManager {
     }
 
     private @Nullable Path findPartialPath(Entity entity, BlockPos target, Function<BlockPos, Path> pathFinder) {
-        var navPath = struct.findPath(entity.getPos(), target.toBottomCenterPos());
+        var navPath = struct.findPath(entity.getEntityPos(), target.toBottomCenterPos());
 
         if (navPath.isEmpty()) {
             return null;
@@ -291,7 +290,7 @@ public class MSManager {
     }
 
     private boolean cancelCobwebSlow(Entity entity, BlockPos blockPos) {
-        return entity.getWorld() == world && monsters.containsKey(entity.getUuid());
+        return entity.getEntityWorld() == world && monsters.containsKey(entity.getUuid());
     }
 
     public Participants participants() {
@@ -307,7 +306,7 @@ public class MSManager {
     }
 
     private void afterMoveTick(MobEntity mob) {
-        if (mob.getWorld() != world || !(monsters.get(mob.getUuid()) instanceof EndermanData data)) return;
+        if (mob.getEntityWorld() != world || !(monsters.get(mob.getUuid()) instanceof EndermanData data)) return;
 
         // make the enderman always face the target player while fleeing
         LivingEntity target = mob.getTarget();
@@ -324,5 +323,13 @@ public class MSManager {
 
         // but look at the target player all the time
         mob.lookAt(EntityAnchorArgumentType.EntityAnchor.EYES, target.getEyePos());
+    }
+
+    private PendingResult<Boolean> isCreakingBeingLookedAt(CreakingEntity creaking) {
+        if (creaking.getEntityWorld() != world || !(monsters.get(creaking.getUuid()) instanceof CreakingData data)) {
+            return PendingResult.pass();
+        }
+
+        return PendingResult.of(data.isBeingLookedAt(creaking));
     }
 }

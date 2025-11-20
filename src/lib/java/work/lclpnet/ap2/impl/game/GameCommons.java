@@ -23,11 +23,9 @@ import org.jetbrains.annotations.Nullable;
 import org.json.JSONObject;
 import work.lclpnet.ap2.ApConstants;
 import work.lclpnet.ap2.api.base.Participants;
-import work.lclpnet.ap2.api.base.WorldBorderManager;
 import work.lclpnet.ap2.api.game.MiniGameHandle;
 import work.lclpnet.ap2.api.game.sink.IntDataSink;
 import work.lclpnet.ap2.api.util.action.Action;
-import work.lclpnet.ap2.api.util.action.PlayerAction;
 import work.lclpnet.ap2.impl.map.MapUtil;
 import work.lclpnet.ap2.impl.resource.ApResources;
 import work.lclpnet.ap2.impl.util.EntityUtil;
@@ -36,10 +34,11 @@ import work.lclpnet.ap2.impl.util.debug.DebugController;
 import work.lclpnet.ap2.impl.util.handler.Visibility;
 import work.lclpnet.ap2.impl.util.handler.VisibilityHandler;
 import work.lclpnet.ap2.impl.util.handler.VisibilityManager;
-import work.lclpnet.ap2.impl.util.math.Vec2i;
-import work.lclpnet.ap2.impl.util.movement.TickMovementDetector;
 import work.lclpnet.ap2.impl.util.scoreboard.CustomScoreboardManager;
 import work.lclpnet.ap2.impl.util.world.WorldBorderRandomizer;
+import work.lclpnet.gaco.collisions.movement.TickMovementDetector;
+import work.lclpnet.gaco.collisions.util.PlayerAction;
+import work.lclpnet.gaco.math.Vec2i;
 import work.lclpnet.kibu.access.entity.ArmorStandAccess;
 import work.lclpnet.kibu.hook.HookFactory;
 import work.lclpnet.kibu.hook.util.PositionRotation;
@@ -53,6 +52,7 @@ import work.lclpnet.lobby.game.map.MapUtils;
 import work.lclpnet.lobby.game.util.BossBarTimer;
 
 import java.util.*;
+import java.util.function.DoubleSupplier;
 
 import static java.lang.Math.floor;
 import static work.lclpnet.kibu.translate.text.FormatWrapper.styled;
@@ -95,6 +95,10 @@ public class GameCommons {
     }
 
     public Action<PlayerAction> whenBelowY(double minY) {
+        return whenBelowY(() -> minY);
+    }
+
+    public Action<PlayerAction> whenBelowY(DoubleSupplier minY) {
         Participants participants = gameHandle.getParticipants();
 
         var hook = PlayerAction.createHook();
@@ -103,12 +107,12 @@ public class GameCommons {
         detector.register(player -> {
             if (!participants.isParticipating(player)) return;
 
-            if (player.getY() < minY) {
+            if (player.getY() < minY.getAsDouble()) {
                 hook.invoker().act(player);
             }
         });
 
-        detector.init(gameHandle.getGameScheduler(), gameHandle.getHooks());
+        detector.init(gameHandle.getScheduler(), gameHandle.getHooks());
 
         return Action.create(hook);
     }
@@ -118,7 +122,7 @@ public class GameCommons {
     }
 
     public Action<Runnable> scheduleWorldBorderShrink(long delayTicks, long durationTicks, long finalDelayTicks, Random random) {
-        TaskScheduler scheduler = gameHandle.getGameScheduler();
+        TaskScheduler scheduler = gameHandle.getScheduler();
 
         var hook = HookFactory.createArrayBacked(Runnable.class, callbacks -> () -> {
             for (Runnable callback : callbacks) {
@@ -186,9 +190,6 @@ public class GameCommons {
     }
 
     public WorldBorder setupWorldBorder(WorldBorderConfig config) {
-        WorldBorderManager manager = gameHandle.getWorldBorderManager();
-        manager.setupWorldBorder(world);
-
         WorldBorder worldBorder = gameHandle.getWorldBorderManager().getWorldBorder();
         worldBorder.setCenter(config.centerX() + 0.5, config.centerZ() + 0.5);
         worldBorder.setSize(config.maxRadius());
@@ -209,7 +210,7 @@ public class GameCommons {
             }
         });
 
-        gameHandle.getGameScheduler().interval(1, new SchedulerAction() {
+        gameHandle.getScheduler().interval(1, new SchedulerAction() {
             int timer = durationTicks;
 
             @Override
@@ -252,7 +253,7 @@ public class GameCommons {
                 .build();
 
         timer.addPlayers(PlayerLookup.all(gameHandle.getServer()));
-        timer.start(gameHandle.getBossBarProvider(), gameHandle.getGameScheduler());
+        timer.start(gameHandle.getBossBarProvider(), gameHandle.getScheduler());
 
         return timer;
     }

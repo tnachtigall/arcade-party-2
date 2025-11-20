@@ -25,9 +25,9 @@ import work.lclpnet.ap2.impl.game.data.IntDataContainer;
 import work.lclpnet.ap2.impl.game.data.type.PlayerRef;
 import work.lclpnet.ap2.impl.map.MapUtil;
 import work.lclpnet.ap2.impl.map.ServerThreadMapBootstrap;
-import work.lclpnet.ap2.impl.util.BlockBox;
 import work.lclpnet.ap2.impl.util.ItemHelper;
 import work.lclpnet.ap2.impl.util.TextUtil;
+import work.lclpnet.gaco.ds.BlockBox;
 import work.lclpnet.kibu.hook.HookRegistrar;
 import work.lclpnet.kibu.hook.world.BlockModificationHooks;
 import work.lclpnet.kibu.translate.Translations;
@@ -80,7 +80,7 @@ public class MiningBattleInstance extends FFAGameInstance implements MapBootstra
     }
 
     @Override
-    protected void ready() {
+    protected void go() {
         gameHandle.protect(config -> config.allow(ProtectionTypes.BREAK_BLOCKS, (entity, pos) -> canBeMined(pos)));
 
         HookRegistrar hooks = gameHandle.getHooks();

@@ -17,28 +17,33 @@ import net.minecraft.util.math.BlockPos;
 import net.minecraft.util.math.Vec3d;
 import work.lclpnet.ap2.api.game.MiniGameHandle;
 import work.lclpnet.ap2.api.game.data.DataContainer;
-import work.lclpnet.ap2.api.util.CollisionDetector;
 import work.lclpnet.ap2.impl.game.FFAGameInstance;
-import work.lclpnet.ap2.impl.game.data.DataContainers;
+import work.lclpnet.ap2.impl.game.data.CombinedDataContainer;
 import work.lclpnet.ap2.impl.game.data.IntDataContainer;
+import work.lclpnet.ap2.impl.game.data.IntScoreDataContainer;
+import work.lclpnet.ap2.impl.game.data.OrderedDataContainer;
 import work.lclpnet.ap2.impl.game.data.type.PlayerRef;
 import work.lclpnet.ap2.impl.map.MapUtil;
-import work.lclpnet.ap2.impl.util.BlockBox;
-import work.lclpnet.ap2.impl.util.collision.ChunkedCollisionDetector;
-import work.lclpnet.ap2.impl.util.collision.PlayerMovementObserver;
 import work.lclpnet.ap2.impl.util.effect.ApEffects;
 import work.lclpnet.ap2.impl.util.movement.CooldownMovementBlocker;
 import work.lclpnet.ap2.impl.util.movement.MovementBlocker;
 import work.lclpnet.ap2.impl.util.scoreboard.CustomScoreboardManager;
+import work.lclpnet.gaco.collisions.ChunkedCollisionDetector;
+import work.lclpnet.gaco.collisions.CollisionDetector;
+import work.lclpnet.gaco.collisions.movement.PlayerMovementObserver;
+import work.lclpnet.gaco.ds.BlockBox;
 import work.lclpnet.kibu.hook.HookRegistrar;
 import work.lclpnet.kibu.scheduler.Ticks;
 import work.lclpnet.lobby.game.map.GameMap;
 
+import java.util.List;
 import java.util.Random;
 
 public class MirrorHopInstance extends FFAGameInstance {
 
-    private final IntDataContainer<ServerPlayerEntity, PlayerRef> data;
+    private final OrderedDataContainer<ServerPlayerEntity, PlayerRef> winnerData;
+    private final IntDataContainer<ServerPlayerEntity, PlayerRef> scoreData;
+    private final CombinedDataContainer<ServerPlayerEntity, PlayerRef> combinedData;
     private final CollisionDetector collisionDetector = new ChunkedCollisionDetector();
     private final PlayerMovementObserver movementObserver;
     private final MovementBlocker movementBlocker;
@@ -48,14 +53,16 @@ public class MirrorHopInstance extends FFAGameInstance {
     public MirrorHopInstance(MiniGameHandle gameHandle) {
         super(gameHandle);
 
-        movementObserver = new PlayerMovementObserver(collisionDetector, gameHandle.getParticipants()::isParticipating);
-        movementBlocker = new CooldownMovementBlocker(gameHandle.getScheduler());
-        data = DataContainers.finaleCompatibleScoreContainer(gameHandle, PlayerRef::create);
+        movementObserver = new PlayerMovementObserver(collisionDetector, gameHandle.getParticipants()::isParticipating, true, 0e-5);
+        movementBlocker = new CooldownMovementBlocker(gameHandle.getRootScheduler());
+        winnerData = new OrderedDataContainer<>(PlayerRef::create);
+        scoreData = new IntScoreDataContainer<>(PlayerRef::create);
+        combinedData = new CombinedDataContainer<>(List.of(winnerData, scoreData));
     }
 
     @Override
     protected DataContainer<ServerPlayerEntity, PlayerRef> getData() {
-        return data;
+        return combinedData;
     }
 
     @Override
@@ -78,7 +85,7 @@ public class MirrorHopInstance extends FFAGameInstance {
     }
 
     @Override
-    protected void ready() {
+    protected void go() {
         GameMap map = getMap();
         ServerWorld world = getWorld();
         HookRegistrar hooks = gameHandle.getHooks();
@@ -91,7 +98,7 @@ public class MirrorHopInstance extends FFAGameInstance {
         movementObserver.whenEntering(goal, player -> {
             if (winManager.isGameOver()) return;
 
-            data.setScore(player, choices.getChoices().size() + 1);
+            winnerData.add(player);
 
             winManager.complete();
         });
@@ -102,23 +109,18 @@ public class MirrorHopInstance extends FFAGameInstance {
             int idx = choices.getChoiceIndex(platform);
             if (idx == -1) return;
 
-            if (!choices.isCorrect(platform, idx)) {
-                collisionDetector.remove(collider);
+            if (idx > progress) {
+                commons().addScore(player, 1, scoreData);
+                progress = idx;
+            }
 
+            collisionDetector.remove(collider);
+
+            if (choices.isCorrect(platform, idx)) {
+                solidifyPlatform(platform);
+            } else {
                 breakPlatform(platform);
-                return;
             }
-
-            int score = idx + 1;
-
-            if (score > data.getScore(player)) {
-                data.setScore(player, score);
-            }
-
-            if (progress >= idx) return;
-
-            progress = idx;
-            solidifyPlatform(platform);
         });
 
         movementBlocker.init(hooks);

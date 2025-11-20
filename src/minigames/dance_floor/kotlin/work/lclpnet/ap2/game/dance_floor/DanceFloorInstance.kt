@@ -9,7 +9,6 @@ import net.minecraft.server.network.ServerPlayerEntity
 import net.minecraft.server.world.ServerWorld
 import net.minecraft.sound.SoundCategory
 import net.minecraft.sound.SoundEvents
-import net.minecraft.util.Identifier
 import net.minecraft.world.GameMode
 import org.json.JSONObject
 import work.lclpnet.ap2.*
@@ -34,14 +33,15 @@ import work.lclpnet.kibu.scheduler.api.TaskHandle
 import work.lclpnet.lobby.game.map.GameMap
 import java.util.concurrent.CompletableFuture
 import kotlin.math.max
+import kotlin.math.round
 import kotlin.math.roundToInt
 import kotlin.random.Random
 import kotlin.random.asJavaRandom
 
-private val MIN_DELAY_TICKS = Ticks.seconds(10)
-private val MAX_DELAY_TICKS = Ticks.seconds(15)
+private val MIN_DELAY_TICKS = Ticks.seconds(6)
+private val MAX_DELAY_TICKS = Ticks.seconds(10)
 
-private const val INITIAL_BLOCK_DELAY_TICKS = 70
+private const val INITIAL_BLOCK_DELAY_TICKS = 68
 private const val BLOCK_DELAY_TICKS_DECREASE_PER_MINUTE = 13
 private const val TOTAL_MIN_BLOCK_DELAY_TICKS = 5
 
@@ -60,6 +60,8 @@ class DanceFloorInstance(gameHandle: MiniGameHandle) : EliminationGameInstance(g
     var blockRandomizer: BlockRandomizer? = null
     var spectatorSpawns = mutableListOf<PositionRotation>()
     var visibilityManager: VisibilityManager? = null
+    var delayTicks = MAX_DELAY_TICKS
+    var round = 1
 
     init {
         useRemainingPlayersDisplay()
@@ -96,13 +98,13 @@ class DanceFloorInstance(gameHandle: MiniGameHandle) : EliminationGameInstance(g
         }
     }
 
-    override fun ready() {
+    override fun go() {
         commons().whenBelowCriticalHeight().then { player -> softEliminate(player) }
         nextCycle()
 
         val particleShape = MapUtil.readShape(map, "particle-shape")
 
-        interval(7) { ->
+        interval(7) {
             if (currentSong == null) return@interval
 
             repeat(PARTICLE_AMOUNT) {
@@ -111,7 +113,7 @@ class DanceFloorInstance(gameHandle: MiniGameHandle) : EliminationGameInstance(g
             }
         }
 
-        interval(1) { ->
+        interval(1) {
             totalDurationTicks++
         }
     }
@@ -188,19 +190,21 @@ class DanceFloorInstance(gameHandle: MiniGameHandle) : EliminationGameInstance(g
         val totalSongTicks = song.checkedSong.song.lastNoteTick().orElseGet { song.checkedSong.song.durationTicks() }
         val remainingSongTicks = totalSongTicks - startTick
 
-        // sample a random duration in game ticks
-        val randomDelayTicks = Random.nextInt(MAX_DELAY_TICKS - MIN_DELAY_TICKS + 1) + MIN_DELAY_TICKS
-
         // convert to song ticks, limited by remaining song ticks
         val songTicks = song.checkedSong.song.tempo()
-            .durationTicks(startTick, randomDelayTicks / 20f)
+            .durationTicks(startTick, delayTicks / 20f)
             .coerceAtMost(remainingSongTicks)
+
+        // decrease ticks
+        val decrease = round(20f / round.toFloat()).toInt()
+        delayTicks = max(MIN_DELAY_TICKS, delayTicks - decrease)
+        round++
 
         // convert clamped back to game time
         val delaySeconds = song.checkedSong.song.tempo().durationSeconds(startTick, songTicks)
-        val delayTicks = delaySeconds.times(20).roundToInt().coerceAtLeast(0)
+        val realDelayTicks = delaySeconds.times(20).roundToInt().coerceAtLeast(0)
 
-        task = timeout(delayTicks) { ->
+        task = timeout(realDelayTicks) {
             val progress = startTick + songTicks
 
             if (progress >= totalSongTicks) {
@@ -258,7 +262,7 @@ class DanceFloorInstance(gameHandle: MiniGameHandle) : EliminationGameInstance(g
 
         val blockDelayTicks = max(TOTAL_MIN_BLOCK_DELAY_TICKS, INITIAL_BLOCK_DELAY_TICKS - decreaseTicks)
 
-        task = timeout(blockDelayTicks) { ->
+        task = timeout(blockDelayTicks) {
             SoundHelper.playSound(world, SoundEvents.ENTITY_WITHER_BREAK_BLOCK, SoundCategory.HOSTILE, 0.4f, 0.8f)
             removeBlocks(block)
         }
@@ -275,7 +279,7 @@ class DanceFloorInstance(gameHandle: MiniGameHandle) : EliminationGameInstance(g
             world.setBlock(pos, Blocks.AIR)
         }
 
-        task = timeout(seconds = 4) { ->
+        task = timeout(seconds = 4) {
             SoundHelper.playSound(world, SoundEvents.ENTITY_EXPERIENCE_ORB_PICKUP, SoundCategory.NEUTRAL, 0.5f, 1f)
             checkEliminated()
         }
@@ -290,8 +294,5 @@ class DanceFloorInstance(gameHandle: MiniGameHandle) : EliminationGameInstance(g
         if (winManager.isGameOver) return
 
         nextCycle()
-    }
-
-    override fun onEliminated(player: ServerPlayerEntity?) {
     }
 }

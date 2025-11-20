@@ -16,7 +16,7 @@ import net.minecraft.util.shape.VoxelShape;
 import work.lclpnet.ap2.api.base.Participants;
 import work.lclpnet.ap2.api.game.MiniGameHandle;
 import work.lclpnet.ap2.impl.game.EliminationGameInstance;
-import work.lclpnet.ap2.impl.util.collision.GroundDetector;
+import work.lclpnet.gaco.collisions.util.GroundDetector;
 import work.lclpnet.kibu.hook.HookRegistrar;
 import work.lclpnet.kibu.hook.world.BlockBreakParticleCallback;
 
@@ -48,12 +48,12 @@ public class TntRunInstance extends EliminationGameInstance {
     }
 
     @Override
-    protected void ready() {
+    protected void go() {
         groundDetector = new GroundDetector(getWorld(), BLOCK_MARGIN);
 
         commons().whenBelowCriticalHeight().then(this::eliminate);
 
-        gameHandle.getGameScheduler().interval(this::tick, 1);
+        gameHandle.getScheduler().interval(this::tick, 1);
     }
 
     private void tick() {

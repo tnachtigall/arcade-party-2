@@ -63,7 +63,7 @@ public class BowSpleefInstance extends EliminationGameInstance {
     public BowSpleefInstance(MiniGameHandle gameHandle) {
         super(gameHandle);
 
-        var cooldown = new VisualCooldown(gameHandle.getScheduler());
+        var cooldown = new VisualCooldown(gameHandle.getRootScheduler());
 
         doubleJumpHandler = new DoubleJumpHandler(player -> !cooldown.isOnCooldown(player) && !heavyWeightItem.isHeavyWeighted(player));
         heavyWeightItem.setDoubleJumpHandler(doubleJumpHandler);
@@ -143,7 +143,7 @@ public class BowSpleefInstance extends EliminationGameInstance {
     }
 
     @Override
-    protected void ready() {
+    protected void go() {
         gameHandle.protect(config -> {
             config.allow(ProtectionTypes.ALLOW_DAMAGE, (entity, damageSource)
                     -> damageSource.isOf(DamageTypes.OUTSIDE_BORDER)

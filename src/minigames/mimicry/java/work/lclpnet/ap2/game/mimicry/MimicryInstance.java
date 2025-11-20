@@ -24,9 +24,9 @@ import work.lclpnet.ap2.impl.game.data.IntScoreDataContainer;
 import work.lclpnet.ap2.impl.game.data.Ordering;
 import work.lclpnet.ap2.impl.game.data.type.PlayerRef;
 import work.lclpnet.ap2.impl.map.MapUtil;
-import work.lclpnet.ap2.impl.util.BlockBox;
-import work.lclpnet.ap2.impl.util.math.AffineIntMatrix;
 import work.lclpnet.ap2.impl.util.world.StackedRoomGenerator;
+import work.lclpnet.gaco.ds.BlockBox;
+import work.lclpnet.gaco.math.AffineIntMatrix;
 import work.lclpnet.kibu.hook.ServerMessageHooks;
 import work.lclpnet.kibu.hook.entity.PlayerInteractionHooks;
 import work.lclpnet.kibu.mc.KibuBlockPos;
@@ -102,11 +102,12 @@ public class MimicryInstance extends FFAGameInstance implements MapBootstrap {
         manager.eachParticipant((player, room) -> room.teleport(player, world));
 
         gameHandle.getHooks().registerHook(ServerMessageHooks.ALLOW_CHAT_MESSAGE, (message, sender, params) -> false);
+        gameHandle.getHooks().registerHook(ServerMessageHooks.ALLOW_COMMAND_MESSAGE, (message, sender, params) -> false);
     }
 
     @Override
-    protected void ready() {
-        sequencePlayer = new SequencePlayer(manager, gameHandle.getGameScheduler(), getWorld());
+    protected void go() {
+        sequencePlayer = new SequencePlayer(manager, gameHandle.getScheduler(), getWorld());
 
         nextSequence();
 
@@ -148,7 +149,7 @@ public class MimicryInstance extends FFAGameInstance implements MapBootstrap {
 
         commons().announcer().announceSubtitle("game.ap2.mimicry.attention");
 
-        gameHandle.getGameScheduler().timeout(this::playSequence, PREPARE_TICKS);
+        gameHandle.getScheduler().timeout(this::playSequence, PREPARE_TICKS);
     }
 
     private synchronized void removeTimer() {
@@ -201,7 +202,7 @@ public class MimicryInstance extends FFAGameInstance implements MapBootstrap {
 
         onRoundOver();
 
-        gameHandle.getGameScheduler().timeout(this::nextSequence, Ticks.seconds(NEXT_ROUND_DELAY_SECONDS));
+        gameHandle.getScheduler().timeout(this::nextSequence, Ticks.seconds(NEXT_ROUND_DELAY_SECONDS));
     }
 
     private synchronized void onRoundOver() {
@@ -232,7 +233,7 @@ public class MimicryInstance extends FFAGameInstance implements MapBootstrap {
 
         onRoundOver();
 
-        gameHandle.getGameScheduler().timeout(this::nextSequence, 30);
+        gameHandle.getScheduler().timeout(this::nextSequence, 30);
     }
 
     private synchronized void softEliminate(ServerPlayerEntity player) {

@@ -5,8 +5,6 @@ import com.mojang.serialization.MapCodec;
 import net.minecraft.block.*;
 import net.minecraft.block.entity.BlockEntityType;
 import net.minecraft.block.entity.SkullBlockEntity;
-import net.minecraft.component.DataComponentTypes;
-import net.minecraft.component.type.NbtComponent;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.attribute.EntityAttributes;
@@ -45,9 +43,11 @@ import work.lclpnet.ap2.impl.game.data.type.PlayerRef;
 import work.lclpnet.ap2.impl.map.MapUtil;
 import work.lclpnet.ap2.impl.tags.PlayerHeadTags;
 import work.lclpnet.ap2.impl.util.*;
+import work.lclpnet.ap2.impl.util.checkpoint.CheckpointHelper;
 import work.lclpnet.ap2.impl.util.scoreboard.CustomScoreboardManager;
 import work.lclpnet.ap2.impl.util.world.block_shape.BlockShape;
-import work.lclpnet.ap2.impl.util.world.entity.DynamicEntityManager;
+import work.lclpnet.gaco.ds.BlockBox;
+import work.lclpnet.gaco.dynamic_entities.DynamicEntityManager;
 import work.lclpnet.kibu.hook.HookRegistrar;
 import work.lclpnet.kibu.hook.entity.PlayerInteractionHooks;
 import work.lclpnet.kibu.hook.player.PlayerSwingHandHook;
@@ -145,11 +145,7 @@ public class EggventureInstance extends FFAGameInstance implements MapBootstrap 
 
         if (skull == null) return false;
 
-        return skull.getComponents()
-                .getOrDefault(DataComponentTypes.CUSTOM_DATA, NbtComponent.DEFAULT)
-                .get(NBT_CODEC)
-                .result()
-                .orElse(false);
+        return CustomNbt.get(skull.getComponents(), NBT_CODEC).orElse(false);
     }
 
     static @NotNull List<PlayerHead> eggVariants(DynamicRegistryManager registryManager) {
@@ -203,12 +199,12 @@ public class EggventureInstance extends FFAGameInstance implements MapBootstrap 
         DynamicEntityManager dynamicEntityManager = new DynamicEntityManager(world);
         var tutorial = new EggventureTutorial(world, dynamicEntityManager, random, gameHandle.getTranslations());
 
-        dynamicEntityManager.init(gameHandle.getGameScheduler(), gameHandle.getHooks());
-        tutorial.start(gameHandle.getGameScheduler(), gameHandle.getParticipants()).thenRun(super::afterInitialDelay);
+        dynamicEntityManager.init(gameHandle.getScheduler(), gameHandle.getHooks());
+        tutorial.start(gameHandle.getScheduler(), gameHandle.getParticipants()).thenRun(super::afterInitialDelay);
     }
 
     @Override
-    protected void ready() {
+    protected void go() {
         GameMap map = getMap();
         BlockBox gate = MapUtil.readBox(map.requireProperty("gate"));
         ServerWorld world = getWorld();
@@ -258,7 +254,16 @@ public class EggventureInstance extends FFAGameInstance implements MapBootstrap 
 
         commons().createTimer(subject, durationSeconds).whenDone(this::completeAndShowRemaining);
 
-        gameHandle.getGameScheduler().interval(20, Ticks.seconds(10), this::checkNearbyEggs);
+        gameHandle.getScheduler().interval(20, Ticks.seconds(10), this::checkNearbyEggs);
+
+        CheckpointHelper.setupResetItem(hooks, winManager::isGameOver, player -> gameHandle.getParticipants().isParticipating(player))
+                .then(this::reset);
+
+        CheckpointHelper.giveResetItem(gameHandle.getParticipants(), getWorld(), gameHandle.getTranslations(), 4);
+    }
+
+    private void reset(ServerPlayerEntity player) {
+        gameHandle.getWorldFacade().teleport(player);
     }
 
     private void checkNearbyEggs() {
@@ -309,7 +314,7 @@ public class EggventureInstance extends FFAGameInstance implements MapBootstrap 
     private void onFindEasterEgg(ServerPlayerEntity player, BlockPos pos) {
         if (winManager.isGameOver()) return;
 
-        ServerWorld world = player.getWorld();
+        ServerWorld world = player.getEntityWorld();
         world.setBlockState(pos, Blocks.AIR.getDefaultState(), Block.SKIP_DROPS | Block.FORCE_STATE | Block.NOTIFY_LISTENERS);
 
         commons().addScore(player, 1, data);
